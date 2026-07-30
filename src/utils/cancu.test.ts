@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   parseCanCu,
   compileCanCu,
@@ -9,8 +9,17 @@ import {
   getEarnedPoints,
   isTaskCompleted,
   hasValidProduct,
+  migrateTasks,
+  isRecurringText,
+  cleanInlineText,
+  formatParagraphText,
+  getDaysSinceLastBackup,
+  recordBackupExport,
 } from './cancu';
 import { TaskBC } from '../types';
+
+
+
 
 function makeTask(overrides: Partial<TaskBC> = {}): TaskBC {
   return {
@@ -189,3 +198,114 @@ describe('isTaskCompleted / hasValidProduct', () => {
     expect(hasValidProduct(makeTask({ sanPham: 'Chưa có' }))).toBe(false);
   });
 });
+
+describe('migrateTasks', () => {
+  it('should parse canCu and populate structured fields if they are missing', () => {
+    const oldTasks: TaskBC[] = [
+      makeTask({
+        canCu: 'Công văn số 123/A-B ngày 01/01/2023 của Đơn vị C về việc D',
+        loaiVanBan: undefined,
+        so: undefined,
+        ngay: undefined,
+        donViBanHanh: undefined,
+        trichYeu: undefined,
+      }),
+    ];
+    const migrated = migrateTasks(oldTasks);
+    expect(migrated[0].loaiVanBan).toBe('Công văn');
+    expect(migrated[0].so).toBe('123/A-B');
+    expect(migrated[0].ngay).toBe('01/01/2023');
+    expect(migrated[0].donViBanHanh).toBe('Đơn vị C');
+    expect(migrated[0].trichYeu).toBe('việc D');
+  });
+
+  it('should not overwrite existing structured fields', () => {
+    const tasks: TaskBC[] = [
+      makeTask({
+        canCu: 'Công văn số 123/A-B ngày 01/01/2023 của Đơn vị C về việc D',
+        loaiVanBan: 'Báo cáo', // Field đã tồn tại
+        so: '456/X-Y', // Field đã tồn tại
+        ngay: '02/02/2024',
+        donViBanHanh: 'Đơn vị Z',
+        trichYeu: 'Việc E',
+      }),
+    ];
+    const migrated = migrateTasks(tasks);
+    expect(migrated[0].loaiVanBan).toBe('Báo cáo');
+    expect(migrated[0].so).toBe('456/X-Y');
+    expect(migrated[0].ngay).toBe('02/02/2024');
+    expect(migrated[0].donViBanHanh).toBe('Đơn vị Z');
+    expect(migrated[0].trichYeu).toBe('Việc E');
+  });
+
+  it('should handle empty canCu string gracefully', () => {
+    const tasks = [makeTask({ canCu: '' })];
+    const migrated = migrateTasks(tasks);
+    expect(migrated[0].loaiVanBan).toBe('');
+    expect(migrated[0].so).toBe('');
+    expect(migrated[0].ngay).toBe('');
+  });
+});
+
+
+describe('isRecurringText', () => {
+  it('should return true for recurring keywords', () => {
+    expect(isRecurringText('Báo cáo định kỳ hằng tháng')).toBe(true);
+    expect(isRecurringText('Làm thường xuyên')).toBe(true);
+    expect(isRecurringText('Nộp mỗi tuần')).toBe(true);
+    expect(isRecurringText('Công việc lặp lại')).toBe(true);
+  });
+
+  it('should return false for non-recurring text', () => {
+    expect(isRecurringText('Hoàn thành trước 30/7')).toBe(false);
+    expect(isRecurringText('Báo cáo một lần')).toBe(false);
+    expect(isRecurringText(undefined)).toBe(false);
+  });
+});
+
+describe('cleanInlineText', () => {
+  it('should remove newlines and collapse multiple spaces', () => {
+    const input = '  Nội dung \n có nhiều   dòng\r\n và   khoảng trắng. ';
+    const expected = 'Nội dung có nhiều dòng và khoảng trắng.';
+    expect(cleanInlineText(input)).toBe(expected);
+  });
+  it('should return empty string for empty input', () => {
+    expect(cleanInlineText('')).toBe('');
+  });
+});
+
+describe('formatParagraphText', () => {
+  it('should preserve single and double newlines but collapse more', () => {
+    const input = 'Dòng 1\n\nDòng 2\n\n\nDòng 3\r\n\r\n\r\n\r\nDòng 4';
+    const expected = 'Dòng 1\n\nDòng 2\n\nDòng 3\n\nDòng 4';
+    expect(formatParagraphText(input)).toBe(expected);
+  });
+
+  it('should trim whitespace from each line', () => {
+    const input = '  Dòng 1  \n   Dòng 2   ';
+    const expected = 'Dòng 1\nDòng 2';
+    expect(formatParagraphText(input)).toBe(expected);
+  });
+});
+
+describe('getDaysSinceLastBackup', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('should return null if no backup has been recorded', () => {
+    expect(getDaysSinceLastBackup()).toBeNull();
+  });
+
+  it('should return 0 for a backup made today', () => {
+    recordBackupExport();
+    expect(getDaysSinceLastBackup()).toBe(0);
+  });
+
+  it('should return correct number of days', () => {
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    localStorage.setItem('ca-xa-last-backup-export-ts', String(threeDaysAgo));
+    expect(getDaysSinceLastBackup()).toBe(3);
+  });
+});
+

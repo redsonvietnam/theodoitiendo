@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "concurrently \"npm:dev\" \"npm:backup:server\"",
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "concurrently \"vite --port=3000 --host=0.0.0.0\" \"npm:backup:server\"",
     "build": "vite build",
     "preview": "vite preview",
-    "backup:server": "node backup-server.js",
+    "backup:server": "node backup-server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -28,16 +30,19 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "concurrently": "^10.0.4",
     "esbuild": "^0.25.0",
+    "jsdom": "^30.0.1",
     "specify-cli": "^0.1.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
-    "vite-plugin-singlefile": "^2.3.3"
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.10"
   }
 }

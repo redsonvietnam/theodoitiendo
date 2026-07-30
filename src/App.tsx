@@ -120,7 +120,7 @@ const compileThoiHanString = (kieu: string, date: string, hour: string, manual: 
 // Fails silently if the server is not running.
 const sendBackupToServer = async (data: AppState) => {
   try {
-    await fetch('http://localhost:3001/backup', {
+    await fetch('http://localhost:3002/backup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -533,7 +533,7 @@ export default function App() {
 
             // 3. Tell the server to delete the restore file to prevent re-loading
             try {
-              await fetch('http://localhost:3001/delete-restore-file', { method: 'POST' });
+              await fetch('http://localhost:3002/delete-restore-file', { method: 'POST' });
               console.log('Restore file cleanup signal sent to server.');
             } catch (e) {
               console.error('Could not send cleanup signal to server:', e);
