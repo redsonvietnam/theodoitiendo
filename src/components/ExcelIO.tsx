@@ -6,12 +6,12 @@
 import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
-import { 
-  Download, 
-  Upload, 
-  RefreshCcw, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  Download,
+  Upload,
+  RefreshCcw,
+  CheckCircle,
+  AlertCircle,
   FileSpreadsheet,
   FileCode
 } from 'lucide-react';
@@ -22,9 +22,10 @@ interface ExcelIOProps {
   state: AppState;
   resetToDefault: () => void;
   importState: (newState: AppState) => void;
+  onBackupExported: () => void;
 }
 
-export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOProps) {
+export default function ExcelIO({ state, resetToDefault, importState, onBackupExported }: ExcelIOProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logs, setLogs] = useState<string[]>(['Sẵn sàng. Chưa có thao tác nào.']);
   const [dragActive, setDragActive] = useState(false);
@@ -80,7 +81,7 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
     try {
       addLog('Đang khởi tạo công cụ định dạng Excel chuyên nghiệp...');
       const workbook = new ExcelJS.Workbook();
-      
+
       const metaThangParts = (state.meta.thang || '7/2026').split('/');
       const thangNum = parseInt(metaThangParts[0], 10) || 7;
       const namNum = parseInt(metaThangParts[1], 10) || 2026;
@@ -228,18 +229,18 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
       };
 
       const colHeaders = [
-        "TT", 
-        "(1) Nhóm lĩnh vực công tác", 
-        "(2) Căn cứ", 
-        "(3) Tiêu chí/nội dung", 
-        "(4) Thời hạn yêu cầu", 
-        "(5) Điểm nhiệm vụ được giao", 
-        "(6) Đơn vị chủ trì theo dõi", 
-        "(7) Sản phẩm", 
-        "(8) Điểm số lượng hoàn thành", 
-        "(9) Điểm chất lượng", 
-        "(10) Điểm tiến độ", 
-        "(11) Minh chứng của điểm vượt mức", 
+        "TT",
+        "(1) Nhóm lĩnh vực công tác",
+        "(2) Căn cứ",
+        "(3) Tiêu chí/nội dung",
+        "(4) Thời hạn yêu cầu",
+        "(5) Điểm nhiệm vụ được giao",
+        "(6) Đơn vị chủ trì theo dõi",
+        "(7) Sản phẩm",
+        "(8) Điểm số lượng hoàn thành",
+        "(9) Điểm chất lượng",
+        "(10) Điểm tiến độ",
+        "(11) Minh chứng của điểm vượt mức",
         "(12) Đơn vị thực hiện"
       ];
 
@@ -277,10 +278,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
           rIdx++;
 
           ws.addRow([
-            "STT", "", "Nội dung/Tiêu chí", "Điểm tối đa", 
-            "Đảm bảo\n(đánh dấu X)", "", 
-            "Không đảm bảo\n(đánh dấu X)", "", 
-            "Điểm đạt (chấm tối đa nếu đảm bảo, chấm 0 điểm nếu không đảm bảo)", "", "", 
+            "STT", "", "Nội dung/Tiêu chí", "Điểm tối đa",
+            "Đảm bảo\n(đánh dấu X)", "",
+            "Không đảm bảo\n(đánh dấu X)", "",
+            "Điểm đạt (chấm tối đa nếu đảm bảo, chấm 0 điểm nếu không đảm bảo)", "", "",
             "Đơn vị theo dõi", ""
           ]);
           ws.mergeCells(rIdx, 1, rIdx, 2);
@@ -311,7 +312,7 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               r.unit || "",
               ""
             ]);
-            
+
             ws.mergeCells(rIdx, 1, rIdx, 2);
             ws.mergeCells(rIdx, 5, rIdx, 6);
             ws.mergeCells(rIdx, 7, rIdx, 8);
@@ -473,12 +474,12 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
 
         if (includeB || includeC) {
           ws.addRow([
-            "", "", "TỔNG ĐIỂM", "", "", 
-            totalGiaoB + totalGiaoC, 
-            "", "", 
-            totalAchieved, 
-            0, 
-            0, 
+            "", "", "TỔNG ĐIỂM", "", "",
+            totalGiaoB + totalGiaoC,
+            "", "",
+            totalAchieved,
+            0,
+            0,
             "", ""
           ]);
           styleRow(rIdx, { bold: true, size: 11, fillColor: 'F2F2F2', height: 28 });
@@ -618,10 +619,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
           r1++;
 
           ws1.addRow([
-            "STT", "", "Nội dung/Tiêu chí", "Điểm tối đa", 
-            "Đảm bảo\n(đánh dấu X)", "", 
-            "Không đảm bảo\n(đánh dấu X)", "", 
-            "Điểm đạt (chấm tối đa nếu đảm bảo, chấm 0 điểm nếu không đảm bảo)", "", "", 
+            "STT", "", "Nội dung/Tiêu chí", "Điểm tối đa",
+            "Đảm bảo\n(đánh dấu X)", "",
+            "Không đảm bảo\n(đánh dấu X)", "",
+            "Điểm đạt (chấm tối đa nếu đảm bảo, chấm 0 điểm nếu không đảm bảo)", "", "",
             "Đơn vị theo dõi", ""
           ]);
           ws1.mergeCells(r1, 1, r1, 2);
@@ -715,12 +716,12 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
           const endB = r2 - 1;
 
           ws2.addRow([
-            "", "", "TỔNG ĐIỂM MỤC II", "", "", 
-            { formula: `SUM(F${startB}:F${endB})`, result: totalGiaoB }, 
-            "", "", 
-            { formula: `SUM(I${startB}:I${endB})`, result: totalScoreB }, 
-            { formula: `SUM(J${startB}:J${endB})`, result: 0 }, 
-            { formula: `SUM(K${startB}:K${endB})`, result: 0 }, 
+            "", "", "TỔNG ĐIỂM MỤC II", "", "",
+            { formula: `SUM(F${startB}:F${endB})`, result: totalGiaoB },
+            "", "",
+            { formula: `SUM(I${startB}:I${endB})`, result: totalScoreB },
+            { formula: `SUM(J${startB}:J${endB})`, result: 0 },
+            { formula: `SUM(K${startB}:K${endB})`, result: 0 },
             "", ""
           ]);
           styleSheetRow(ws2, r2, { bold: true, size: 11, fillColor: 'F2F2F2', height: 28 });
@@ -775,12 +776,12 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
           const endC = r3 - 1;
 
           ws3.addRow([
-            "", "", "TỔNG ĐIỂM MỤC III", "", "", 
-            { formula: `SUM(F${startC}:F${endC})`, result: totalGiaoC }, 
-            "", "", 
-            { formula: `SUM(I${startC}:I${endC})`, result: totalScoreC }, 
-            { formula: `SUM(J${startC}:J${endC})`, result: 0 }, 
-            { formula: `SUM(K${startC}:K${endC})`, result: 0 }, 
+            "", "", "TỔNG ĐIỂM MỤC III", "", "",
+            { formula: `SUM(F${startC}:F${endC})`, result: totalGiaoC },
+            "", "",
+            { formula: `SUM(I${startC}:I${endC})`, result: totalScoreC },
+            { formula: `SUM(J${startC}:J${endC})`, result: 0 },
+            { formula: `SUM(K${startC}:K${endC})`, result: 0 },
             "", ""
           ]);
           styleSheetRow(ws3, r3, { bold: true, size: 11, fillColor: 'F2F2F2', height: 28 });
@@ -869,12 +870,12 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
     if (!val) return null;
     const str = String(val).trim();
     if (!str) return null;
-    
+
     // ISO YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
       return str;
     }
-    
+
     // DD/MM/YYYY or DD-MM-YYYY
     const dmYMatch = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
     if (dmYMatch) {
@@ -971,7 +972,7 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array', cellDates: false });
-      
+
       let updatedCount = 0;
       let addedCount = 0;
       const tempState = JSON.parse(JSON.stringify(state)) as AppState;
@@ -981,8 +982,8 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
 
         // Skip summary / dashboard sheets to prevent reading summary tables as task rows
         if (
-          cleanSheetName.includes('tổng hợp') || 
-          cleanSheetName.includes('summary') || 
+          cleanSheetName.includes('tổng hợp') ||
+          cleanSheetName.includes('summary') ||
           cleanSheetName.includes('dashboard')
         ) {
           return;
@@ -1034,10 +1035,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
 
           // Skip header / summary rows
           if (
-            rowText.includes('TỔNG ĐIỂM') || 
-            rowText.includes('Tổng điểm') || 
-            rowText.includes('KPI') || 
-            rowText.includes('tập thể') || 
+            rowText.includes('TỔNG ĐIỂM') ||
+            rowText.includes('Tổng điểm') ||
+            rowText.includes('KPI') ||
+            rowText.includes('tập thể') ||
             rowText.includes('DANH MỤC NHIỆM VỤ CÔNG TÁC') ||
             rowText.includes('(1) Nhóm lĩnh vực') ||
             firstCellStr === 'TT' ||
@@ -1102,8 +1103,8 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               const donViVal = r[12] ? String(r[12]).trim() : '';
 
               const computedTrangThai = parseTrangThai(
-                r[8], 
-                !isNaN(diemGiao) ? diemGiao : 0.5, 
+                r[8],
+                !isNaN(diemGiao) ? diemGiao : 0.5,
                 sanPhamVal
               );
 
@@ -1164,8 +1165,8 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
             const sttStr = String(r[0] || '').trim();
             const contentStr = r[2] ? String(r[2]).trim() : '';
             if (sttStr || contentStr) {
-              const targetIdx = tempState.D.findIndex(item => 
-                item.type === 'item' && 
+              const targetIdx = tempState.D.findIndex(item =>
+                item.type === 'item' &&
                 (String(item.stt).trim() === sttStr || String(item.stt).trim().padStart(2, '0') === sttStr.padStart(2, '0'))
               );
               if (targetIdx !== -1) {
@@ -1249,11 +1250,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportMode('single')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-22 outline-none ${
-                  exportMode === 'single'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-22 outline-none ${exportMode === 'single'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] shadow-sm'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Gộp chung 1 Sheet</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-1">Tất cả các mục nằm chung trên một trang tính duy nhất</span>
@@ -1261,11 +1261,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportMode('split')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-22 outline-none ${
-                  exportMode === 'split'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-22 outline-none ${exportMode === 'split'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] shadow-sm'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Tách thành 5 Sheet</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-1">1 trang Tổng hợp kết quả và 4 trang chi tiết từng Mục (I, II, III, IV)</span>
@@ -1289,11 +1288,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportSection('all')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${
-                  exportSection === 'all'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${exportSection === 'all'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] font-bold shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Tất cả các mục (I, II, III, IV)</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Xuất đầy đủ báo cáo 4 mục</span>
@@ -1302,11 +1300,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportSection('B')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${
-                  exportSection === 'B'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${exportSection === 'B'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] font-bold shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block text-emerald-700">Chỉ Mục II (Có thời hạn) ★</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Mục thường xuyên theo dõi nhất</span>
@@ -1315,11 +1312,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportSection('BC')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${
-                  exportSection === 'BC'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${exportSection === 'BC'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] font-bold shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Mục II & Mục III</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Việc có thời hạn & việc thường xuyên</span>
@@ -1328,11 +1324,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportSection('A')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${
-                  exportSection === 'A'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${exportSection === 'A'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] font-bold shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Chỉ Mục I (Tiêu chí chung)</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Tiêu chí Hướng dẫn 20-HD/ĐUCA</span>
@@ -1341,11 +1336,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportSection('C')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${
-                  exportSection === 'C'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${exportSection === 'C'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] font-bold shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Chỉ Mục III (Thường xuyên)</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Nhiệm vụ báo cáo định kỳ</span>
@@ -1354,11 +1348,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setExportSection('D')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${
-                  exportSection === 'D'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-16 outline-none ${exportSection === 'D'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e] font-bold shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Chỉ Mục IV (Chỉ tiêu QĐ 11)</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Chỉ tiêu Công an tỉnh giao</span>
@@ -1373,11 +1366,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setTimeFilter('chu_ky')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${
-                  timeFilter === 'chu_ky'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${timeFilter === 'chu_ky'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e]'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">15 tháng trước - 14 tháng này</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Chu kỳ đánh giá thường sử dụng nhất</span>
@@ -1385,11 +1377,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setTimeFilter('thang_nay')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${
-                  timeFilter === 'thang_nay'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${timeFilter === 'thang_nay'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e]'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Việc trong tháng này</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Lọc theo tháng dương lịch hiện tại</span>
@@ -1397,11 +1388,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setTimeFilter('custom')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${
-                  timeFilter === 'custom'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${timeFilter === 'custom'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e]'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Tùy chỉnh khoảng ngày</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Chọn khoảng ngày bắt đầu - kết thúc</span>
@@ -1409,11 +1399,10 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
               <button
                 type="button"
                 onClick={() => setTimeFilter('all')}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${
-                  timeFilter === 'all'
+                className={`p-2.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between h-18 outline-none ${timeFilter === 'all'
                     ? 'border-[#a3212e] bg-[#a3212e]/5 text-[#a3212e]'
                     : 'border-slate-200 hover:border-slate-300 text-slate-500 bg-slate-50/50'
-                }`}
+                  }`}
               >
                 <span className="text-[11px] font-bold block">Tất cả thời gian</span>
                 <span className="text-[9px] font-medium leading-normal text-slate-400 block mt-0.5">Xuất toàn bộ nhiệm vụ hiện có</span>
@@ -1473,9 +1462,8 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
                 return (
                   <label
                     key={st.label}
-                    className={`flex items-center gap-2 p-1.5 rounded-lg cursor-pointer transition select-none ${
-                      isChecked ? 'bg-white text-[#a3212e] font-bold shadow-xs' : 'text-slate-500 hover:text-slate-950'
-                    }`}
+                    className={`flex items-center gap-2 p-1.5 rounded-lg cursor-pointer transition select-none ${isChecked ? 'bg-white text-[#a3212e] font-bold shadow-xs' : 'text-slate-500 hover:text-slate-950'
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -1494,7 +1482,7 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
                 );
               })}
             </div>
-            
+
             <div className="flex justify-between text-[10px] font-semibold text-slate-400 mt-1 uppercase px-1">
               <button
                 type="button"
@@ -1548,16 +1536,15 @@ export default function ExcelIO({ state, resetToDefault, importState }: ExcelIOP
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer flex flex-col items-center gap-2 ${
-              dragActive 
-                ? 'border-[#a3212e] bg-rose-50/10' 
+            className={`border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer flex flex-col items-center gap-2 ${dragActive
+                ? 'border-[#a3212e] bg-rose-50/10'
                 : 'border-slate-200 hover:border-[#a3212e] bg-slate-50/50'
-            }`}
+              }`}
           >
             <Upload className="w-6 h-6 text-slate-400 group-hover:text-[#a3212e]" />
             <span className="text-xs text-slate-600 font-bold">Kéo thả file Excel vào đây hoặc click để duyệt</span>
             <span className="text-[10px] text-slate-400 font-semibold">Chấp nhận .xlsx hoặc .xls</span>
-            
+
             <input
               type="file"
               ref={fileInputRef}

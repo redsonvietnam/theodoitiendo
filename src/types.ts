@@ -44,7 +44,7 @@ export interface TaskBC {
   kieuThoiHan?: string;     // Kiểu thời hạn: "Trước ngày", "Trước ngày hằng tháng", "Hằng năm", ...
   donViTheoDoi?: string;    // Đơn vị giao theo dõi (mặc định trùng donViBanHanh)
   ghiChu?: string;          // Ghi chú
-  
+
   // Danh sách các mốc thời hạn bổ sung (Phương án 1)
   danhSachMoc?: TaskMilestone[];
 
@@ -82,6 +82,7 @@ export interface AppState {
   B: TaskBC[];
   C: TaskBC[];
   D: TaskD[];
+  hiddenSidebarItems?: ActiveTab[]; // New field to store hidden sidebar items
 }
 
-export type ActiveTab = 'dashboard' | 'calendar' | 'A' | 'B' | 'C' | 'BC' | 'D' | 'excel';
+export type ActiveTab = 'dashboard' | 'calendar' | 'A' | 'B' | 'C' | 'BC' | 'D' | 'excel' | 'settings';

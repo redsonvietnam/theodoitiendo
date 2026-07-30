@@ -15,6 +15,7 @@ import CalendarView from './components/CalendarView';
 import ExcelIO from './components/ExcelIO';
 import MilestoneManager from './components/MilestoneManager';
 import NotificationPanel from './components/NotificationPanel';
+import Settings from './components/Settings';
 import { SEED_A, SEED_B, SEED_C, SEED_D } from './data';
 import { AppState, ActiveTab, TaskBC, TaskD, TaskMilestone } from './types';
 import { Save, CheckCircle, Plus, X, HelpCircle, AlertTriangle, Maximize2, Minimize2, List, LayoutGrid, Table } from 'lucide-react';
@@ -136,7 +137,7 @@ export default function App() {
     try {
       const snoozeUntil = Date.now() + BACKUP_SNOOZE_DAYS * 24 * 60 * 60 * 1000;
       localStorage.setItem(BACKUP_SNOOZE_KEY, String(snoozeUntil));
-    } catch {}
+    } catch { }
   };
 
   const isBackupSnoozed = (): boolean => {
@@ -162,7 +163,7 @@ export default function App() {
     setViewModeD(mode);
     try {
       localStorage.setItem('mainD_viewMode', mode);
-    } catch {}
+    } catch { }
   };
 
   // States for Section I and Section IV visibility (hidden by default)
@@ -179,7 +180,7 @@ export default function App() {
       const next = !prev;
       try {
         localStorage.setItem('show_section_I_IV', String(next));
-      } catch {}
+      } catch { }
       return next;
     });
   };
@@ -215,14 +216,14 @@ export default function App() {
     setViewModeB(mode);
     try {
       localStorage.setItem('mainB_viewMode', mode);
-    } catch {}
+    } catch { }
   };
 
   const handleSetViewModeC = (mode: 'card' | 'excel') => {
     setViewModeC(mode);
     try {
       localStorage.setItem('mainC_viewMode', mode);
-    } catch {}
+    } catch { }
   };
 
   const [viewModeBC, setViewModeBC] = useState<'card' | 'excel'>(() => {
@@ -237,7 +238,7 @@ export default function App() {
     setViewModeBC(mode);
     try {
       localStorage.setItem('mainBC_viewMode', mode);
-    } catch {}
+    } catch { }
   };
 
   // Global modal state
@@ -376,7 +377,7 @@ export default function App() {
       const index = match.index;
       const numPart = num.substring(0, index).trim();
       const rawSymPart = num.substring(index).replace(/^\//, ''); // remove leading slash if typed
-      
+
       const expanded = tryExpandShorthand(rawSymPart);
       if (expanded) {
         setSoNumberOnly(numPart);
@@ -434,7 +435,7 @@ export default function App() {
     }
 
     const expanded = tryExpandShorthand(cleanSym);
-    
+
     if (expanded) {
       setSoSymbolOnly(expanded.expandedSymbol);
       setSo(soNumberOnly ? `${soNumberOnly}${expanded.expandedSymbol}` : expanded.expandedSymbol);
@@ -443,7 +444,7 @@ export default function App() {
       const symWithSlash = sym.startsWith('/') ? sym : `/${sym}`;
       setSoSymbolOnly(symWithSlash);
       setSo(soNumberOnly ? `${soNumberOnly}${symWithSlash}` : symWithSlash);
-      
+
       const parsed = parseDocumentSymbolTwoWay(symWithSlash);
       applyTwoWayParsedResult(parsed.detectedLoaiVanBan, parsed.detectedIsFromCAT, parsed.detectedDeptCode);
     }
@@ -500,7 +501,7 @@ export default function App() {
     } catch (e) {
       console.error('Error loading state from localStorage:', e);
     }
-    
+
     // Default initial state
     return {
       meta: {
@@ -510,15 +511,22 @@ export default function App() {
       A: SEED_A,
       B: migrateTasks(SEED_B),
       C: migrateTasks(SEED_C),
-      D: SEED_D
+      D: SEED_D,
+      hiddenSidebarItems: [] // Initialize hidden items
     };
   });
 
   // Automatically save state on changes
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      
+      // Filter out functions or non-serializable data before saving
+      const stateToSave = {
+        ...state,
+        // Ensure only serializable data is saved for hiddenSidebarItems
+        hiddenSidebarItems: state.hiddenSidebarItems?.filter(item => typeof item === 'string') || []
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+
       // Flash save toast quickly
       setShowSaveToast(true);
       const timer = setTimeout(() => setShowSaveToast(false), 800);
@@ -539,6 +547,14 @@ export default function App() {
     }));
   };
 
+  // Update hidden sidebar items
+  const updateHiddenSidebarItems = (items: ActiveTab[]) => {
+    setState(prev => ({
+      ...prev,
+      hiddenSidebarItems: items
+    }));
+  };
+
   // Update task status for Section A
   const updateStatusA = (idx: number, status: 'dam_bao' | 'khong_dam_bao' | '') => {
     setState(prev => {
@@ -553,26 +569,26 @@ export default function App() {
     setState(prev => {
       const copy = [...prev[section]];
       let updatedItem = { ...copy[idx] };
-      
+
       if (typeof fieldOrFields === 'object' && fieldOrFields !== null) {
         updatedItem = { ...updatedItem, ...fieldOrFields };
       } else {
         updatedItem = { ...updatedItem, [fieldOrFields as keyof TaskBC]: value };
       }
-      
+
       // Auto transition status to 'Hoàn thành đúng hạn' if sanPham is entered and has content
       if (updatedItem.sanPham && updatedItem.sanPham.trim() !== '') {
         if (!updatedItem.trangThai || updatedItem.trangThai === 'Chưa hoàn thành') {
           updatedItem.trangThai = 'Hoàn thành đúng hạn';
         }
       }
-      
+
       // If updating any of the 5 fields, compile canCu automatically
       const keys = typeof fieldOrFields === 'object' ? Object.keys(fieldOrFields) : [fieldOrFields];
       if (keys.some(k => ['loaiVanBan', 'so', 'ngay', 'donViBanHanh', 'trichYeu'].includes(k))) {
         updatedItem.canCu = compileCanCu(updatedItem);
       }
-      
+
       copy[idx] = updatedItem;
       let updatedState = { ...prev };
       updatedState[section] = copy;
@@ -604,7 +620,7 @@ export default function App() {
       const list = prev[section];
       const maxStt = list.reduce((max, t) => t.stt > max ? t.stt : max, 0);
       const nextId = `${section}${list.length + 1}_${Date.now().toString().slice(-4)}`;
-      
+
       const compiledCanCu = compileCanCu(newTask);
       let finalTrangThai = newTask.trangThai;
       if (newTask.sanPham && newTask.sanPham.trim() !== '') {
@@ -651,7 +667,7 @@ export default function App() {
 
     const finalNgayHetHan = ngayHetHan || getTodayDateString();
     const finalThoiHan = compileThoiHanString(kieuThoiHan, finalNgayHetHan, gioHetHan, thoiHan);
-    
+
     // Auto-detect recurring logic for custom input
     let finalKieuThoiHan = kieuThoiHan;
     if (kieuThoiHan === 'custom') {
@@ -665,8 +681,8 @@ export default function App() {
 
     // If both number and symbol are blank, do not auto-fill default symbol
     const computedSymbol = soSymbolOnly ? (soSymbolOnly.startsWith('/') ? soSymbolOnly : `/${soSymbolOnly}`) : '';
-    const fallbackSo = soNumberOnly 
-      ? `${soNumberOnly}${computedSymbol}` 
+    const fallbackSo = soNumberOnly
+      ? `${soNumberOnly}${computedSymbol}`
       : computedSymbol;
     const finalSo = so.trim() || fallbackSo;
 
@@ -759,7 +775,7 @@ export default function App() {
     if (!dateStr) return null;
     const deadline = new Date(dateStr + 'T00:00:00');
     const today = new Date(REFERENCE_TODAY + 'T00:00:00');
-    
+
     // Calculate difference in days
     const diffTime = deadline.getTime() - today.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
@@ -779,37 +795,37 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <Dashboard 
-            state={state} 
-            setActiveTab={(tab) => setActiveTab(tab)} 
+          <Dashboard
+            state={state}
+            setActiveTab={(tab) => setActiveTab(tab)}
             todayISO={REFERENCE_TODAY}
             daysUntil={daysUntil}
             onOpenTaskDetail={(sec, taskId) => {
               setActiveTab(sec);
               setActiveEditingTaskId(taskId);
             }}
-            showSectionI_IV={showSectionI_IV}
-            onToggleSectionI_IV={handleToggleSectionI_IV}
+          // showSectionI_IV={showSectionI_IV} // No longer needed, handled by hiddenSidebarItems
+          // onToggleSectionI_IV={handleToggleSectionI_IV} // No longer needed
           />
         );
       case 'calendar':
         return (
-          <CalendarView 
+          <CalendarView
             state={state}
             updateTaskBC={(sec, idx, field, val) => updateTaskBC(sec, idx, field, val)}
           />
         );
       case 'A':
         return (
-          <MainA 
-            tasks={state.A} 
-            updateStatus={updateStatusA} 
+          <MainA
+            tasks={state.A}
+            updateStatus={updateStatusA}
           />
         );
       case 'B':
         return (
-          <MainB 
-            tasks={state.B} 
+          <MainB
+            tasks={state.B}
             updateTask={(idx, field, val) => updateTaskBC('B', idx, field, val)}
             addTask={(task) => addTaskBC('B', task)}
             deleteTask={(idx) => deleteTaskBC('B', idx)}
@@ -826,8 +842,8 @@ export default function App() {
         );
       case 'C':
         return (
-          <MainC 
-            tasks={state.C} 
+          <MainC
+            tasks={state.C}
             updateTask={(idx, field, val) => updateTaskBC('C', idx, field, val)}
             addTask={(task) => addTaskBC('C', task)}
             deleteTask={(idx) => deleteTaskBC('C', idx)}
@@ -844,9 +860,9 @@ export default function App() {
         );
       case 'BC':
         return (
-          <MainBC 
-            tasksB={state.B} 
-            tasksC={state.C} 
+          <MainBC
+            tasksB={state.B}
+            tasksC={state.C}
             updateTaskB={(idx, field, val) => updateTaskBC('B', idx, field, val)}
             updateTaskC={(idx, field, val) => updateTaskBC('C', idx, field, val)}
             addTaskB={(task) => addTaskBC('B', task)}
@@ -866,9 +882,9 @@ export default function App() {
         );
       case 'D':
         return (
-          <MainD 
-            tasks={state.D} 
-            updateTask={updateTaskD} 
+          <MainD
+            tasks={state.D}
+            updateTask={updateTaskD}
             activeSectionIdx={selectedSectionDIdx}
             setActiveSectionIdx={setSelectedSectionDIdx}
             viewMode={viewModeD}
@@ -877,14 +893,21 @@ export default function App() {
         );
       case 'excel':
         return (
-          <ExcelIO 
-            state={state} 
-            resetToDefault={resetToDefault} 
+          <ExcelIO
+            state={state}
+            resetToDefault={resetToDefault}
             importState={handleImportState}
             onBackupExported={() => {
               setDaysSinceBackup(0);
               setBackupReminderDismissed(false);
             }}
+          />
+        );
+      case 'settings':
+        return (
+          <Settings
+            hiddenItems={state.hiddenSidebarItems || []}
+            updateHiddenItems={updateHiddenSidebarItems}
           />
         );
       default:
@@ -895,10 +918,10 @@ export default function App() {
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f4f2ec] text-[#1c2430]">
       {/* Side Navigation Bar */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        meta={state.meta} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        meta={state.meta}
         updateMeta={updateMeta}
         taskCounts={taskCounts}
         tasksD={state.D}
@@ -912,15 +935,14 @@ export default function App() {
           setSidebarCollapsed(!sidebarCollapsed);
           if (workspaceExpanded) setWorkspaceExpanded(false);
         }}
-        showSectionI_IV={showSectionI_IV}
-        onToggleSectionI_IV={handleToggleSectionI_IV}
+        hiddenSidebarItems={state.hiddenSidebarItems || []}
+        updateHiddenSidebarItems={updateHiddenSidebarItems}
       />
 
       {/* Main Workspace Frame */}
-      <main className={`flex-1 min-w-0 p-3 sm:p-4 lg:p-5 w-full relative transition-all duration-300 ${
-        workspaceExpanded ? 'max-w-none' : 'max-w-[96%] xl:max-w-[1550px] 2xl:max-w-[1720px] mx-auto'
-      }`}>
-        
+      <main className={`flex-1 min-w-0 p-3 sm:p-4 lg:p-5 w-full relative transition-all duration-300 ${workspaceExpanded ? 'max-w-none' : 'max-w-[96%] xl:max-w-[1550px] 2xl:max-w-[1720px] mx-auto'
+        }`}>
+
         {/* Sticky top utilities bar with floating design */}
         <div className="sticky top-0 z-45 bg-[#f4f2ec]/95 backdrop-blur-md pb-4 mb-6 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -943,11 +965,10 @@ export default function App() {
                     else if (activeTab === 'C') handleSetViewModeC('card');
                     else handleSetViewModeBC('card');
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    (activeTab === 'B' ? viewModeB : activeTab === 'C' ? viewModeC : viewModeBC) === 'card'
-                      ? 'bg-[#a3212e] text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-950'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${(activeTab === 'B' ? viewModeB : activeTab === 'C' ? viewModeC : viewModeBC) === 'card'
+                    ? 'bg-[#a3212e] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-950'
+                    }`}
                   title="Xem dạng thẻ"
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
@@ -960,11 +981,10 @@ export default function App() {
                     else if (activeTab === 'C') handleSetViewModeC('excel');
                     else handleSetViewModeBC('excel');
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    (activeTab === 'B' ? viewModeB : activeTab === 'C' ? viewModeC : viewModeBC) === 'excel'
-                      ? 'bg-[#a3212e] text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-950'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${(activeTab === 'B' ? viewModeB : activeTab === 'C' ? viewModeC : viewModeBC) === 'excel'
+                    ? 'bg-[#a3212e] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-950'
+                    }`}
                   title="Xem dạng bảng Excel"
                 >
                   <Table className="w-3.5 h-3.5" />
@@ -1003,11 +1023,10 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleSetViewModeD('list')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${
-                    viewModeD === 'list'
-                      ? 'bg-white text-[#a3212e] shadow-sm animate-fade-in'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${viewModeD === 'list'
+                    ? 'bg-white text-[#a3212e] shadow-sm animate-fade-in'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   title="Xem dạng danh sách"
                 >
                   <List className="w-3.5 h-3.5" />
@@ -1016,11 +1035,10 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleSetViewModeD('kanban')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${
-                    viewModeD === 'kanban'
-                      ? 'bg-white text-[#a3212e] shadow-sm animate-fade-in'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all outline-none cursor-pointer ${viewModeD === 'kanban'
+                    ? 'bg-white text-[#a3212e] shadow-sm animate-fade-in'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   title="Xem dạng Kanban"
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
@@ -1077,7 +1095,7 @@ export default function App() {
       {isGlobalAddOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
-            
+
             {/* Header */}
             <div className="bg-[#0f2444] text-white p-5 flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center gap-2.5">
@@ -1086,7 +1104,7 @@ export default function App() {
                   <h3 className="font-medium text-base tracking-wide uppercase">THÊM MỚI CHỈ ĐẠO / CHỈ TIÊU</h3>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsGlobalAddOpen(false)}
                 className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
               >
@@ -1096,10 +1114,10 @@ export default function App() {
 
             {/* Form */}
             <form onSubmit={handleGlobalSaveTask} className="p-6 space-y-5">
-              
+
               {/* THREE COLUMN GRID FOR FORM SECTIONS */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-                
+
                 {/* COLUMN 1: SECTION I - THÔNG TIN VĂN BẢN GỐC (Document Metadata) */}
                 <div className="order-1 bg-[#fcfcfc] border border-slate-200/80 rounded-xl p-4 space-y-4">
                   <span className="text-xs font-bold text-[#0f2444] tracking-wider uppercase block border-b border-slate-200/60 pb-1.5">
@@ -1186,11 +1204,11 @@ export default function App() {
                       </select>
                       {!COMMON_DOC_TYPES.includes(loaiVanBan) && loaiVanBan !== undefined && (
                         <input
-                           type="text"
-                           className="bg-white border border-slate-200 text-slate-700 px-2.5 py-2 rounded-lg text-xs font-medium outline-none focus:border-[#a3212e] flex-1 min-w-[80px]"
-                           placeholder="Nhập loại..."
-                           value={loaiVanBan}
-                           onChange={(e) => handleDocTypeChange(e.target.value)}
+                          type="text"
+                          className="bg-white border border-slate-200 text-slate-700 px-2.5 py-2 rounded-lg text-xs font-medium outline-none focus:border-[#a3212e] flex-1 min-w-[80px]"
+                          placeholder="Nhập loại..."
+                          value={loaiVanBan}
+                          onChange={(e) => handleDocTypeChange(e.target.value)}
                         />
                       )}
                     </div>
@@ -1214,16 +1232,15 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => handleCATToggle(!isFromCAT)}
-                        className={`w-full flex items-center justify-center px-1 py-2 rounded-lg border transition cursor-pointer h-[38px] ${
-                          isFromCAT
-                            ? 'bg-red-50 border-red-300 text-[#a3212e] shadow-sm'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                        className={`w-full flex items-center justify-center px-1 py-2 rounded-lg border transition cursor-pointer h-[38px] ${isFromCAT
+                          ? 'bg-red-50 border-red-300 text-[#a3212e] shadow-sm'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
                       >
                         <input
                           type="checkbox"
                           checked={isFromCAT}
-                          onChange={() => {}} // handled by button onClick
+                          onChange={() => { }} // handled by button onClick
                           className="rounded text-[#a3212e] focus:ring-[#a3212e] cursor-pointer w-4 h-4"
                         />
                       </button>
@@ -1295,8 +1312,8 @@ export default function App() {
                             tabIndex={-1}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             value={ngay}
-                            onClick={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) {} }}
-                            onFocus={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) {} }}
+                            onClick={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) { } }}
+                            onFocus={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) { } }}
                             onChange={(e) => {
                               const val = e.target.value;
                               setNgay(val);
@@ -1550,10 +1567,9 @@ export default function App() {
       )}
 
       {/* Floating Saving feedback Toast */}
-      <div 
-        className={`fixed bottom-6 right-6 bg-[#0f2444] border border-slate-700 text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-semibold transition-all duration-300 transform z-50 ${
-          showSaveToast ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95 pointer-events-none'
-        }`}
+      <div
+        className={`fixed bottom-6 right-6 bg-[#0f2444] border border-slate-700 text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-semibold transition-all duration-300 transform z-50 ${showSaveToast ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95 pointer-events-none'
+          }`}
       >
         <CheckCircle className="w-4 h-4 text-emerald-400" />
         <span>Tự động lưu...</span>
