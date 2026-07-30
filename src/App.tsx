@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { getState, setState as setStateToDb } from './db';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import MainA from './components/MainA';
@@ -22,9 +23,6 @@ import { Save, CheckCircle, Plus, X, HelpCircle, AlertTriangle, Maximize2, Minim
 import { migrateTasks, compileCanCu, isRecurringText, cleanInlineText, formatParagraphText, daysUntil, getDaysSinceLastBackup } from './utils/cancu';
 import { POLICE_DEPARTMENTS, suggestDocumentSymbol, parseDocumentNumber, formatDonViBanHanhDisplay, parseDocumentSymbolTwoWay, tryExpandShorthand, formatToDDMMYY, parseQuickDate } from './utils/documentHelper';
 import DeptCombobox from './components/DeptCombobox';
-
-
-const STORAGE_KEY = 'ca-xa-nhiemvu-state-v3';
 
 const getTodayDateString = () => {
   const d = new Date();
@@ -116,6 +114,24 @@ const compileThoiHanString = (kieu: string, date: string, hour: string, manual: 
     return `Hằng năm trước${timeStr} ngày ${dayMonth}`;
   }
   return `Hạn chót: ${dateVN}${timeStr}`;
+};
+
+// Attempts to send the current app state to a local backup server.
+// Fails silently if the server is not running.
+const sendBackupToServer = async (data: AppState) => {
+  try {
+    await fetch('http://localhost:3001/backup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    // The server logs success, no need for client-side logs here.
+  } catch (error) {
+    // This is expected if the backup server isn't running.
+    // console.log('Local backup server not found. Skipping automatic backup.');
+  }
 };
 
 export default function App() {
@@ -265,6 +281,7 @@ export default function App() {
   const [ghiChu, setGhiChu] = useState('');
   const [danhSachMoc, setDanhSachMoc] = useState<TaskMilestone[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
 
   // Document numbering automation helper states
   const [soNumberOnly, setSoNumberOnly] = useState('');
@@ -486,55 +503,121 @@ export default function App() {
     setIsExpanded(false);
     setIsGlobalAddOpen(true);
   };
-  const [state, setState] = useState<AppState>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        parsed.B = migrateTasks(parsed.B || []);
-        parsed.C = migrateTasks(parsed.C || []);
-        if (parsed.meta && (parsed.meta.donVi === 'Công an xã Lộc Nga' || !parsed.meta.donVi)) {
-          parsed.meta.donVi = 'Công an xã Nâm Nung';
-        }
-        return parsed;
-      }
-    } catch (e) {
-      console.error('Error loading state from localStorage:', e);
-    }
 
-    // Default initial state
-    return {
-      meta: {
-        donVi: 'Công an xã Nâm Nung',
-        thang: '07/2026'
-      },
-      A: SEED_A,
-      B: migrateTasks(SEED_B),
-      C: migrateTasks(SEED_C),
-      D: SEED_D,
-      hiddenSidebarItems: [] // Initialize hidden items
-    };
+  // Default initial state, will be overwritten by data from IndexedDB
+  const [state, setState] = useState<AppState>({
+    meta: { donVi: 'Công an xã Nâm Nung', thang: '07/2026' },
+    A: [], B: [], C: [], D: [], hiddenSidebarItems: []
   });
 
-  // Automatically save state on changes
+  // Load state from IndexedDB on initial render, with restore check
   useEffect(() => {
-    try {
-      // Filter out functions or non-serializable data before saving
-      const stateToSave = {
-        ...state,
-        // Ensure only serializable data is saved for hiddenSidebarItems
-        hiddenSidebarItems: state.hiddenSidebarItems?.filter(item => typeof item === 'string') || []
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    const loadState = async () => {
+      // --- ONE-CLICK RESTORE LOGIC ---
+      try {
+        const response = await fetch('/restore.json');
+        if (response.ok) {
+          const restoredData = await response.json();
 
-      // Flash save toast quickly
-      setShowSaveToast(true);
-      const timer = setTimeout(() => setShowSaveToast(false), 800);
-      return () => clearTimeout(timer);
-    } catch (e) {
-      console.error('Error saving state to localStorage:', e);
-    }
-  }, [state]);
+          // Basic validation
+          if (restoredData && restoredData.meta && Array.isArray(restoredData.B)) {
+            console.log('Restore file found, proceeding with data recovery.');
+
+            // 1. Overwrite IndexedDB with the restored data
+            await setStateToDb(restoredData);
+
+            // 2. Set the app state to the restored data
+            setState(restoredData);
+
+            alert('Dữ liệu đã được phục hồi thành công từ file backup gần nhất!');
+
+            // 3. Tell the server to delete the restore file to prevent re-loading
+            try {
+              await fetch('http://localhost:3001/delete-restore-file', { method: 'POST' });
+              console.log('Restore file cleanup signal sent to server.');
+            } catch (e) {
+              console.error('Could not send cleanup signal to server:', e);
+            }
+
+            // 4. Stop further execution of the normal load process
+            setIsLoading(false);
+            return;
+          }
+        }
+        // If response is not OK (e.g., 404), it's not a restore scenario, so we just continue.
+      } catch (error) {
+        // This is normal if the file doesn't exist. Silently continue to normal loading.
+      }
+      // --- END OF RESTORE LOGIC ---
+
+      try {
+        const savedState = await getState();
+        if (savedState) {
+          // Perform migrations or checks if needed
+          savedState.B = migrateTasks(savedState.B || []);
+          savedState.C = migrateTasks(savedState.C || []);
+          if (savedState.meta && (savedState.meta.donVi === 'Công an xã Lộc Nga' || !savedState.meta.donVi)) {
+            savedState.meta.donVi = 'Công an xã Nâm Nung';
+          }
+          setState(savedState);
+        } else {
+          // If no saved state, load the seed data
+          setState({
+            meta: { donVi: 'Công an xã Nâm Nung', thang: '07/2026' },
+            A: SEED_A,
+            B: migrateTasks(SEED_B),
+            C: migrateTasks(SEED_C),
+            D: SEED_D,
+            hiddenSidebarItems: []
+          });
+        }
+      } catch (e) {
+        console.error('Error loading state from IndexedDB:', e);
+        // Fallback to seed data on error
+        setState({
+          meta: { donVi: 'Công an xã Nâm Nung', thang: '07/2026' },
+          A: SEED_A,
+          B: migrateTasks(SEED_B),
+          C: migrateTasks(SEED_C),
+          D: SEED_D,
+          hiddenSidebarItems: []
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadState();
+  }, []); // Empty dependency array ensures this runs only once
+
+  // Automatically save state to IndexedDB on changes
+  useEffect(() => {
+    // Do not save the initial empty/default state
+    if (isLoading) return;
+
+    const saveState = async () => {
+      try {
+        const stateToSave = {
+          ...state,
+          hiddenSidebarItems: state.hiddenSidebarItems?.filter(item => typeof item === 'string') || []
+        };
+        await setStateToDb(stateToSave);
+        sendBackupToServer(stateToSave); // Attempt to send backup to local server
+
+        // Flash save toast quickly
+        setShowSaveToast(true);
+        const timer = setTimeout(() => setShowSaveToast(false), 800);
+        return () => clearTimeout(timer);
+      } catch (e) {
+        console.error('Error saving state to IndexedDB:', e);
+      }
+    };
+
+    // Debounce saving to avoid excessive writes
+    const debounceTimer = setTimeout(saveState, 300);
+    return () => clearTimeout(debounceTimer);
+
+  }, [state, isLoading]);
+
 
   // Update meta fields
   const updateMeta = (field: keyof typeof state.meta, value: string) => {
@@ -784,10 +867,10 @@ export default function App() {
 
   // Compile counts for sidebar badges
   const taskCounts = {
-    A: state.A.length,
-    B: state.B.length,
-    C: state.C.length,
-    D: state.D.filter(t => t.type === 'item').length
+    A: state.A?.length || 0,
+    B: state.B?.length || 0,
+    C: state.C?.length || 0,
+    D: state.D?.filter(t => t.type === 'item').length || 0
   };
 
   // Render correct tab view content
@@ -914,6 +997,17 @@ export default function App() {
         return null;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#f4f2ec]">
+        <div className="text-center">
+          <p className="text-lg font-semibold text-[#0f2444]">Đang tải dữ liệu...</p>
+          <p className="text-sm text-slate-500">Vui lòng chờ trong giây lát.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f4f2ec] text-[#1c2430]">
