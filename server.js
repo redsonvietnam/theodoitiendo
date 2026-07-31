@@ -20,7 +20,7 @@ import { getAppState, saveAppState, findUserByUsername } from './server/db.js';
 import { verifyPassword, signToken, authMiddleware } from './server/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3003;
 
 export function createServer() {
   const app = express();

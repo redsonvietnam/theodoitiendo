@@ -40,6 +40,7 @@ const sendBackupToServer = async (data: AppState) => {
       body: JSON.stringify(data),
     });
   } catch (error) {
+    console.error('Backup server request failed:', error);
     // Expected if the local backup server isn't running.
   }
 };
@@ -142,7 +143,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         authToken: token, authUser: me, needsAuth: false, authError: null,
       });
       // Cache to IndexedDB so the app still shows something if the server drops later.
-      Promise.resolve(setDbState(savedState)).catch(() => {});
+      Promise.resolve(setDbState(savedState)).catch(() => { });
       return true;
     } catch (e) {
       if (e instanceof AuthRequiredError) {

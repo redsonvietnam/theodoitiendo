@@ -74,3 +74,7 @@ export function countUsers() {
 export function listUsers() {
   return db.prepare('SELECT id, username, role, created_at FROM users').all();
 }
+
+export function updateUserPassword(username, passwordHash) {
+  return db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(passwordHash, username);
+}
