@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 3002;
+const PORT = 3001;
 const BACKUP_DIR = path.join(__dirname, 'backups');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const LATEST_BACKUP_PATH = path.join(BACKUP_DIR, 'latest_backup.json');

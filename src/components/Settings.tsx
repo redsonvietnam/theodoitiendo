@@ -1,12 +1,16 @@
 import React from 'react';
 import { ActiveTab } from '../types';
+import { AuthUser } from '../api/backendClient';
 
 interface SettingsProps {
     hiddenItems: ActiveTab[];
     updateHiddenItems: (items: ActiveTab[]) => void;
+    /** Only set when running via the local backend (`node server.js`). */
+    authUser?: AuthUser | null;
+    onLogout?: () => void;
 }
 
-export default function Settings({ hiddenItems, updateHiddenItems }: SettingsProps) {
+export default function Settings({ hiddenItems, updateHiddenItems, authUser, onLogout }: SettingsProps) {
     const allTabs: { id: ActiveTab; label: string }[] = [
         { id: 'dashboard', label: 'Tổng quan' },
         { id: 'calendar', label: 'Lịch nhiệm vụ' },
@@ -27,7 +31,25 @@ export default function Settings({ hiddenItems, updateHiddenItems }: SettingsPro
     };
 
     return (
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200 space-y-6">
+            {authUser && (
+                <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-slate-50">
+                    <div>
+                        <p className="text-sm font-semibold text-[#0f2444]">{authUser.username}</p>
+                        <p className="text-xs text-slate-500">
+                            {authUser.role === 'lanh_dao' ? 'Lãnh đạo' : 'Công an cấp xã'} · Đang đăng nhập qua máy chủ
+                        </p>
+                    </div>
+                    {onLogout && (
+                        <button
+                            onClick={onLogout}
+                            className="px-3 py-1.5 text-sm font-medium text-[#a3212e] border border-[#a3212e]/30 rounded-lg hover:bg-[#a3212e]/5 transition"
+                        >
+                            Đăng xuất
+                        </button>
+                    )}
+                </div>
+            )}
             <h2 className="text-lg font-bold text-[#0f2444] mb-4">Cấu hình hiển thị Sidebar</h2>
             <p className="text-sm text-slate-600 mb-6">Chọn các mục bạn muốn ẩn khỏi thanh điều hướng bên trái:</p>
             <div className="space-y-3">

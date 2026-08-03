@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { getState, setState as setStateToDb } from './db';
+import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import MainA from './components/MainA';
@@ -17,20 +16,17 @@ import ExcelIO from './components/ExcelIO';
 import MilestoneManager from './components/MilestoneManager';
 import NotificationPanel from './components/NotificationPanel';
 import Settings from './components/Settings';
-import { SEED_A, SEED_B, SEED_C, SEED_D } from './data';
-import { AppState, ActiveTab, TaskBC, TaskD, TaskMilestone } from './types';
+import Login from './components/Login';
+import { ActiveTab } from './types';
 import { Save, CheckCircle, Plus, X, HelpCircle, AlertTriangle, Maximize2, Minimize2, List, LayoutGrid, Table } from 'lucide-react';
-import { migrateTasks, compileCanCu, isRecurringText, cleanInlineText, formatParagraphText, daysUntil, getDaysSinceLastBackup } from './utils/cancu';
-import { POLICE_DEPARTMENTS, suggestDocumentSymbol, parseDocumentNumber, formatDonViBanHanhDisplay, parseDocumentSymbolTwoWay, tryExpandShorthand, formatToDDMMYY, parseQuickDate } from './utils/documentHelper';
+import { cleanInlineText, formatParagraphText } from './utils/cancu';
+import { POLICE_DEPARTMENTS, suggestDocumentSymbol, formatToDDMMYY, parseQuickDate } from './utils/documentHelper';
 import DeptCombobox from './components/DeptCombobox';
-
-const getTodayDateString = () => {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
+import { getTodayDateString, formatDateVN } from './utils/dateHelpers';
+import { useAppState } from './hooks/useAppState';
+import { useBackupReminder } from './hooks/useBackupReminder';
+import { useViewPreferences } from './hooks/useViewPreferences';
+import { useGlobalAddTaskForm } from './hooks/useGlobalAddTaskForm';
 
 // Reference date is dynamic and defaults to the actual current date
 const REFERENCE_TODAY = getTodayDateString();
@@ -69,788 +65,52 @@ const COMMON_DOC_TYPES = [
   'Thông tư'
 ];
 
-const formatDateVN = (dateStr: string) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateStr;
-};
-
-const getDayOfDate = (dateStr: string) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return parts[2];
-  }
-  return '';
-};
-
-const getDayMonthOfDate = (dateStr: string) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}`;
-  }
-  return '';
-};
-
-const compileThoiHanString = (kieu: string, date: string, hour: string, manual: string) => {
-  if (kieu === 'custom' || kieu === 'custom_c') return manual;
-  if (!date) return '';
-  const timeStr = hour ? ` ${hour}` : '';
-  const dateVN = formatDateVN(date);
-  const dayOnly = getDayOfDate(date);
-  const dayMonth = getDayMonthOfDate(date);
-
-  if (kieu === 'truoc_ngay') {
-    return `Trước${timeStr} ngày ${dateVN}`;
-  }
-  if (kieu === 'truoc_ngay_hang_thang') {
-    return `Trước${timeStr} ngày ${dayOnly} hằng tháng`;
-  }
-  if (kieu === 'hang_nam') {
-    return `Hằng năm trước${timeStr} ngày ${dayMonth}`;
-  }
-  return `Hạn chót: ${dateVN}${timeStr}`;
-};
-
-// Attempts to send the current app state to a local backup server.
-// Fails silently if the server is not running.
-const sendBackupToServer = async (data: AppState) => {
-  try {
-    await fetch('http://localhost:3002/backup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    // The server logs success, no need for client-side logs here.
-  } catch (error) {
-    // This is expected if the backup server isn't running.
-    // console.log('Local backup server not found. Skipping automatic backup.');
-  }
-};
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [activeEditingTaskId, setActiveEditingTaskId] = useState<string | null>(null);
   const [selectedSectionDIdx, setSelectedSectionDIdx] = useState<number | null>(null);
-  const [showSaveToast, setShowSaveToast] = useState(false);
 
-  // Backup reminder: data lives only in this browser's localStorage, so
-  // periodically nudge the user to export an Excel backup.
-  const BACKUP_SNOOZE_KEY = 'ca-xa-backup-reminder-snoozed-until';
-  const BACKUP_REMINDER_THRESHOLD_DAYS = 7;
-  const BACKUP_SNOOZE_DAYS = 3;
-  const [backupReminderDismissed, setBackupReminderDismissed] = useState(false);
-  const [daysSinceBackup, setDaysSinceBackup] = useState<number | null>(() => getDaysSinceLastBackup());
-
-  const dismissBackupReminder = () => {
-    setBackupReminderDismissed(true);
-    try {
-      const snoozeUntil = Date.now() + BACKUP_SNOOZE_DAYS * 24 * 60 * 60 * 1000;
-      localStorage.setItem(BACKUP_SNOOZE_KEY, String(snoozeUntil));
-    } catch { }
-  };
-
-  const isBackupSnoozed = (): boolean => {
-    try {
-      const raw = localStorage.getItem(BACKUP_SNOOZE_KEY);
-      if (!raw) return false;
-      const snoozeUntil = parseInt(raw, 10);
-      return !isNaN(snoozeUntil) && Date.now() < snoozeUntil;
-    } catch {
-      return false;
-    }
-  };
-
-  const [viewModeD, setViewModeD] = useState<'list' | 'kanban'>(() => {
-    try {
-      return (localStorage.getItem('mainD_viewMode') as 'list' | 'kanban') || 'list';
-    } catch {
-      return 'list';
-    }
-  });
-
-  const handleSetViewModeD = (mode: 'list' | 'kanban') => {
-    setViewModeD(mode);
-    try {
-      localStorage.setItem('mainD_viewMode', mode);
-    } catch { }
-  };
-
-  // States for Section I and Section IV visibility (hidden by default)
-  const [showSectionI_IV, setShowSectionI_IV] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('show_section_I_IV') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  const handleToggleSectionI_IV = () => {
-    setShowSectionI_IV(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem('show_section_I_IV', String(next));
-      } catch { }
-      return next;
-    });
-  };
-
-  // Workspace layout and expansion states
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('sidebar_collapsed') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [workspaceExpanded, setWorkspaceExpanded] = useState<boolean>(false);
-
-  // States for Section B and C view modes
-  const [viewModeB, setViewModeB] = useState<'card' | 'excel'>(() => {
-    try {
-      return (localStorage.getItem('mainB_viewMode') as 'card' | 'excel') || 'card';
-    } catch {
-      return 'card';
-    }
-  });
-
-  const [viewModeC, setViewModeC] = useState<'card' | 'excel'>(() => {
-    try {
-      return (localStorage.getItem('mainC_viewMode') as 'card' | 'excel') || 'card';
-    } catch {
-      return 'card';
-    }
-  });
-
-  const handleSetViewModeB = (mode: 'card' | 'excel') => {
-    setViewModeB(mode);
-    try {
-      localStorage.setItem('mainB_viewMode', mode);
-    } catch { }
-  };
-
-  const handleSetViewModeC = (mode: 'card' | 'excel') => {
-    setViewModeC(mode);
-    try {
-      localStorage.setItem('mainC_viewMode', mode);
-    } catch { }
-  };
-
-  const [viewModeBC, setViewModeBC] = useState<'card' | 'excel'>(() => {
-    try {
-      return (localStorage.getItem('mainBC_viewMode') as 'card' | 'excel') || 'card';
-    } catch {
-      return 'card';
-    }
-  });
-
-  const handleSetViewModeBC = (mode: 'card' | 'excel') => {
-    setViewModeBC(mode);
-    try {
-      localStorage.setItem('mainBC_viewMode', mode);
-    } catch { }
-  };
-
-  // Global modal state
-  const [isGlobalAddOpen, setIsGlobalAddOpen] = useState(false);
-  const [targetSection, setTargetSection] = useState<'B' | 'C'>('B');
-
-  // Form states for adding tasks
-  const [loaiVanBan, setLoaiVanBan] = useState('Kế hoạch');
-  const [so, setSo] = useState('');
-  const [ngay, setNgay] = useState(getTodayDateString());
-  const [quickDate, setQuickDate] = useState(formatToDDMMYY(getTodayDateString()));
-  const [quickDateHetHan, setQuickDateHetHan] = useState(formatToDDMMYY(getTodayDateString()));
-  const [donViBanHanh, setDonViBanHanh] = useState('');
-  const [trichYeu, setTrichYeu] = useState('');
-  const [noiDung, setNoiDung] = useState('');
-  const [thoiHan, setThoiHan] = useState('');
-  const [diemGiao, setDiemGiao] = useState<number>(0.5);
-  const [donVi, setDonVi] = useState('');
-  const [sanPham, setSanPham] = useState('');
-  const [ngayHetHan, setNgayHetHan] = useState(getTodayDateString());
-  const [gioHetHan, setGioHetHan] = useState('00:00');
-  const [kieuThoiHan, setKieuThoiHan] = useState('truoc_ngay');
-  const [donViTheoDoi, setDonViTheoDoi] = useState('');
-  const [ghiChu, setGhiChu] = useState('');
-  const [danhSachMoc, setDanhSachMoc] = useState<TaskMilestone[]>([]);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
-
-  // Document numbering automation helper states
-  const [soNumberOnly, setSoNumberOnly] = useState('');
-  const [soSymbolOnly, setSoSymbolOnly] = useState('');
-  const [selectedDeptCode, setSelectedDeptCode] = useState('');
-  const [isFromCAT, setIsFromCAT] = useState(false);
-
-  const handleDocTypeChange = (newType: string) => {
-    setLoaiVanBan(newType);
-    const newSymbol = suggestDocumentSymbol(newType, selectedDeptCode, isFromCAT);
-    setSoSymbolOnly(newSymbol);
-    setSo(soNumberOnly ? `${soNumberOnly}${newSymbol}` : newSymbol);
-  };
-
-  const handleDeptCodeChange = (newCode: string) => {
-    setSelectedDeptCode(newCode);
-
-    // Auto-populate Đơn vị ban hành & Đơn vị theo dõi
-    if (newCode === 'KHAC') {
-      setDonViBanHanh('');
-    } else if (!newCode) {
-      if (!isFromCAT) setDonViBanHanh('');
-      setDonViTheoDoi('');
-    } else {
-      const deptObj = POLICE_DEPARTMENTS.find(d => d.code === newCode);
-      if (deptObj) {
-        if (isFromCAT) {
-          setDonViBanHanh('CAT');
-          setDonViTheoDoi(deptObj.name);
-        } else {
-          setDonViBanHanh(deptObj.code);
-          setDonViTheoDoi(deptObj.name);
-        }
-      }
-    }
-
-    const newSymbol = suggestDocumentSymbol(loaiVanBan, newCode, isFromCAT);
-    setSoSymbolOnly(newSymbol);
-    setSo(soNumberOnly ? `${soNumberOnly}${newSymbol}` : newSymbol);
-  };
-
-  useEffect(() => {
-    if (isGlobalAddOpen) {
-      setTimeout(() => {
-        const input = document.getElementById('add-task-so-number');
-        if (input) {
-          input.focus();
-        }
-      }, 80);
-    }
-  }, [isGlobalAddOpen]);
-
-  const handleCATToggle = (checked: boolean) => {
-    setIsFromCAT(checked);
-
-    // Auto-update Đơn vị ban hành
-    const deptObj = POLICE_DEPARTMENTS.find(d => d.code === selectedDeptCode);
-    if (checked) {
-      setDonViBanHanh('CAT');
-      if (deptObj) {
-        setDonViTheoDoi(deptObj.name);
-      }
-    } else {
-      if (deptObj) {
-        setDonViBanHanh(deptObj.code);
-        setDonViTheoDoi(deptObj.name);
-      } else if (selectedDeptCode === 'KHAC' || !selectedDeptCode) {
-        setDonViBanHanh('');
-      }
-    }
-
-    const newSymbol = suggestDocumentSymbol(loaiVanBan, selectedDeptCode, checked);
-    setSoSymbolOnly(newSymbol);
-    setSo(soNumberOnly ? `${soNumberOnly}${newSymbol}` : newSymbol);
-  };
-
-  const applyTwoWayParsedResult = (
-    detectedLoaiVanBan: string | undefined,
-    detectedIsFromCAT: boolean,
-    detectedDeptCode: string | undefined
-  ) => {
-    if (detectedLoaiVanBan) {
-      setLoaiVanBan(detectedLoaiVanBan);
-    }
-    setIsFromCAT(detectedIsFromCAT);
-    setSelectedDeptCode(detectedDeptCode || '');
-
-    if (detectedDeptCode) {
-      const deptObj = POLICE_DEPARTMENTS.find(d => d.code === detectedDeptCode);
-      if (deptObj) {
-        if (detectedIsFromCAT) {
-          setDonViBanHanh('CAT');
-          setDonViTheoDoi(deptObj.name);
-        } else {
-          setDonViBanHanh(deptObj.code);
-          setDonViTheoDoi(deptObj.name);
-        }
-      }
-    } else {
-      if (detectedIsFromCAT) {
-        setDonViBanHanh('CAT');
-      }
-    }
-  };
-
-  const handleSoNumberChange = (num: string) => {
-    // Split if there is a slash or a letter (a-z, A-Z)
-    const match = num.match(/[a-zA-Z/]/);
-    if (match && match.index !== undefined) {
-      const index = match.index;
-      const numPart = num.substring(0, index).trim();
-      const rawSymPart = num.substring(index).replace(/^\//, ''); // remove leading slash if typed
-
-      const expanded = tryExpandShorthand(rawSymPart);
-      if (expanded) {
-        setSoNumberOnly(numPart);
-        setSoSymbolOnly(expanded.expandedSymbol);
-        setSo(`${numPart}${expanded.expandedSymbol}`);
-        applyTwoWayParsedResult(expanded.docType, expanded.isFromCAT, expanded.departmentCode);
-      } else {
-        const symPart = '/' + rawSymPart;
-        setSoNumberOnly(numPart);
-        setSoSymbolOnly(symPart);
-        setSo(`${numPart}${symPart}`);
-        const parsed = parseDocumentSymbolTwoWay(symPart);
-        applyTwoWayParsedResult(parsed.detectedLoaiVanBan, parsed.detectedIsFromCAT, parsed.detectedDeptCode);
-      }
-
-      // Automatically focus the symbol input field
-      setTimeout(() => {
-        const symbolInput = document.getElementById('add-task-so-symbol') as HTMLInputElement | null;
-        if (symbolInput) {
-          symbolInput.focus();
-          symbolInput.setSelectionRange(symbolInput.value.length, symbolInput.value.length);
-        }
-      }, 50);
-    } else {
-      setSoNumberOnly(num);
-      const symPart = soSymbolOnly ? (soSymbolOnly.startsWith('/') ? soSymbolOnly : `/${soSymbolOnly}`) : '';
-      setSo(num ? `${num}${symPart}` : symPart);
-    }
-  };
-
-  const handleSymbolKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      const displayVal = soSymbolOnly.startsWith('/') ? soSymbolOnly.substring(1) : soSymbolOnly;
-      if (displayVal === '') {
-        e.preventDefault();
-        const numInput = document.getElementById('add-task-so-number') as HTMLInputElement | null;
-        if (numInput) {
-          numInput.focus();
-          const newVal = soNumberOnly.slice(0, -1);
-          handleSoNumberChange(newVal);
-        }
-      }
-    }
-  };
-
-  const handleSoSymbolManualChange = (sym: string) => {
-    let cleanSym = sym.startsWith('/') ? sym.substring(1) : sym;
-    cleanSym = cleanSym.trim();
-
-    if (!cleanSym) {
-      setSoSymbolOnly('');
-      setSo(soNumberOnly);
-      applyTwoWayParsedResult(loaiVanBan, isFromCAT, '');
-      return;
-    }
-
-    const expanded = tryExpandShorthand(cleanSym);
-
-    if (expanded) {
-      setSoSymbolOnly(expanded.expandedSymbol);
-      setSo(soNumberOnly ? `${soNumberOnly}${expanded.expandedSymbol}` : expanded.expandedSymbol);
-      applyTwoWayParsedResult(expanded.docType, expanded.isFromCAT, expanded.departmentCode);
-    } else {
-      const symWithSlash = sym.startsWith('/') ? sym : `/${sym}`;
-      setSoSymbolOnly(symWithSlash);
-      setSo(soNumberOnly ? `${soNumberOnly}${symWithSlash}` : symWithSlash);
-
-      const parsed = parseDocumentSymbolTwoWay(symWithSlash);
-      applyTwoWayParsedResult(parsed.detectedLoaiVanBan, parsed.detectedIsFromCAT, parsed.detectedDeptCode);
-    }
-  };
-
-  // Handle opening global add modal with designated default section
-  const handleOpenGlobalAdd = (sec: 'B' | 'C') => {
-    setTargetSection(sec);
-    setLoaiVanBan('Kế hoạch');
-    setSo('');
-    setSoNumberOnly('');
-    setSoSymbolOnly('');
-    setSelectedDeptCode('PV01');
-    setIsFromCAT(false);
-    setNgay(getTodayDateString());
-    setQuickDate(formatToDDMMYY(getTodayDateString()));
-    setQuickDateHetHan(formatToDDMMYY(getTodayDateString()));
-    setDonViBanHanh('Phòng Tham mưu');
-    setTrichYeu('');
-    setNoiDung('');
-    setThoiHan('');
-    setDiemGiao(0.5);
-    setDonVi('');
-    setSanPham('');
-    setNgayHetHan(getTodayDateString());
-    setGioHetHan('00:00');
-    setKieuThoiHan('truoc_ngay');
-    setDonViTheoDoi('Phòng Tham mưu');
-    setGhiChu('');
-    setDanhSachMoc([
-      {
-        id: `moc_1_${Date.now()}`,
-        tenMoc: 'Mốc 1',
-        kieuThoiHan: 'truoc_ngay',
-        ngayHetHan: getTodayDateString(),
-        trangThai: 'Chưa hoàn thành'
-      }
-    ]);
-    setIsExpanded(false);
-    setIsGlobalAddOpen(true);
-  };
-
-  // Default initial state, will be overwritten by data from IndexedDB
-  const [state, setState] = useState<AppState>({
-    meta: { donVi: 'Công an xã Nâm Nung', thang: '07/2026' },
-    A: [], B: [], C: [], D: [], hiddenSidebarItems: []
-  });
-
-  // Load state from IndexedDB on initial render, with restore check
-  useEffect(() => {
-    const loadState = async () => {
-      // --- ONE-CLICK RESTORE LOGIC ---
-      try {
-        const response = await fetch('/restore.json');
-        if (response.ok) {
-          const restoredData = await response.json();
-
-          // Basic validation
-          if (restoredData && restoredData.meta && Array.isArray(restoredData.B)) {
-            console.log('Restore file found, proceeding with data recovery.');
-
-            // 1. Overwrite IndexedDB with the restored data
-            await setStateToDb(restoredData);
-
-            // 2. Set the app state to the restored data
-            setState(restoredData);
-
-            alert('Dữ liệu đã được phục hồi thành công từ file backup gần nhất!');
-
-            // 3. Tell the server to delete the restore file to prevent re-loading
-            try {
-              await fetch('http://localhost:3002/delete-restore-file', { method: 'POST' });
-              console.log('Restore file cleanup signal sent to server.');
-            } catch (e) {
-              console.error('Could not send cleanup signal to server:', e);
-            }
-
-            // 4. Stop further execution of the normal load process
-            setIsLoading(false);
-            return;
-          }
-        }
-        // If response is not OK (e.g., 404), it's not a restore scenario, so we just continue.
-      } catch (error) {
-        // This is normal if the file doesn't exist. Silently continue to normal loading.
-      }
-      // --- END OF RESTORE LOGIC ---
-
-      try {
-        const savedState = await getState();
-        if (savedState) {
-          // Perform migrations or checks if needed
-          savedState.B = migrateTasks(savedState.B || []);
-          savedState.C = migrateTasks(savedState.C || []);
-          if (savedState.meta && (savedState.meta.donVi === 'Công an xã Lộc Nga' || !savedState.meta.donVi)) {
-            savedState.meta.donVi = 'Công an xã Nâm Nung';
-          }
-          setState(savedState);
-        } else {
-          // If no saved state, load the seed data
-          setState({
-            meta: { donVi: 'Công an xã Nâm Nung', thang: '07/2026' },
-            A: SEED_A,
-            B: migrateTasks(SEED_B),
-            C: migrateTasks(SEED_C),
-            D: SEED_D,
-            hiddenSidebarItems: []
-          });
-        }
-      } catch (e) {
-        console.error('Error loading state from IndexedDB:', e);
-        // Fallback to seed data on error
-        setState({
-          meta: { donVi: 'Công an xã Nâm Nung', thang: '07/2026' },
-          A: SEED_A,
-          B: migrateTasks(SEED_B),
-          C: migrateTasks(SEED_C),
-          D: SEED_D,
-          hiddenSidebarItems: []
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadState();
-  }, []); // Empty dependency array ensures this runs only once
-
-  // Automatically save state to IndexedDB on changes
-  useEffect(() => {
-    // Do not save the initial empty/default state
-    if (isLoading) return;
-
-    const saveState = async () => {
-      try {
-        const stateToSave = {
-          ...state,
-          hiddenSidebarItems: state.hiddenSidebarItems?.filter(item => typeof item === 'string') || []
-        };
-        await setStateToDb(stateToSave);
-        sendBackupToServer(stateToSave); // Attempt to send backup to local server
-
-        // Flash save toast quickly
-        setShowSaveToast(true);
-        const timer = setTimeout(() => setShowSaveToast(false), 800);
-        return () => clearTimeout(timer);
-      } catch (e) {
-        console.error('Error saving state to IndexedDB:', e);
-      }
-    };
-
-    // Debounce saving to avoid excessive writes
-    const debounceTimer = setTimeout(saveState, 300);
-    return () => clearTimeout(debounceTimer);
-
-  }, [state, isLoading]);
-
-
-  // Update meta fields
-  const updateMeta = (field: keyof typeof state.meta, value: string) => {
-    setState(prev => ({
-      ...prev,
-      meta: {
-        ...prev.meta,
-        [field]: value
-      }
-    }));
-  };
-
-  // Update hidden sidebar items
-  const updateHiddenSidebarItems = (items: ActiveTab[]) => {
-    setState(prev => ({
-      ...prev,
-      hiddenSidebarItems: items
-    }));
-  };
-
-  // Update task status for Section A
-  const updateStatusA = (idx: number, status: 'dam_bao' | 'khong_dam_bao' | '') => {
-    setState(prev => {
-      const copyA = [...prev.A];
-      copyA[idx] = { ...copyA[idx], status };
-      return { ...prev, A: copyA };
-    });
-  };
-
-  // Update task fields for Sections B and C
-  const updateTaskBC = (section: 'B' | 'C', idx: number, fieldOrFields: keyof TaskBC | Partial<TaskBC>, value?: any) => {
-    setState(prev => {
-      const copy = [...prev[section]];
-      let updatedItem = { ...copy[idx] };
-
-      if (typeof fieldOrFields === 'object' && fieldOrFields !== null) {
-        updatedItem = { ...updatedItem, ...fieldOrFields };
-      } else {
-        updatedItem = { ...updatedItem, [fieldOrFields as keyof TaskBC]: value };
-      }
-
-      // Auto transition status to 'Hoàn thành đúng hạn' if sanPham is entered and has content
-      if (updatedItem.sanPham && updatedItem.sanPham.trim() !== '') {
-        if (!updatedItem.trangThai || updatedItem.trangThai === 'Chưa hoàn thành') {
-          updatedItem.trangThai = 'Hoàn thành đúng hạn';
-        }
-      }
-
-      // If updating any of the 5 fields, compile canCu automatically
-      const keys = typeof fieldOrFields === 'object' ? Object.keys(fieldOrFields) : [fieldOrFields];
-      if (keys.some(k => ['loaiVanBan', 'so', 'ngay', 'donViBanHanh', 'trichYeu'].includes(k))) {
-        updatedItem.canCu = compileCanCu(updatedItem);
-      }
-
-      copy[idx] = updatedItem;
-      let updatedState = { ...prev };
-      updatedState[section] = copy;
-
-      // If updating Section B and it becomes recurring, auto-add to Section C
-      const isRecurring = updatedItem.kieuThoiHan === 'truoc_ngay_hang_thang' || updatedItem.kieuThoiHan === 'hang_nam';
-      if (section === 'B' && isRecurring) {
-        const listC = prev.C;
-        const existsInC = listC.some(t => t.noiDung === updatedItem.noiDung);
-        if (!existsInC) {
-          const maxSttC = listC.reduce((max, t) => t.stt > max ? t.stt : max, 0);
-          const nextIdC = `C${listC.length + 1}_${Date.now().toString().slice(-4)}`;
-          const itemC: TaskBC = {
-            ...updatedItem,
-            id: nextIdC,
-            stt: maxSttC + 1
-          };
-          updatedState.C = [...listC, itemC];
-        }
-      }
-
-      return updatedState;
-    });
-  };
-
-  // Add task for Sections B and C
-  const addTaskBC = (section: 'B' | 'C', newTask: Omit<TaskBC, 'id' | 'stt'>) => {
-    setState(prev => {
-      const list = prev[section];
-      const maxStt = list.reduce((max, t) => t.stt > max ? t.stt : max, 0);
-      const nextId = `${section}${list.length + 1}_${Date.now().toString().slice(-4)}`;
-
-      const compiledCanCu = compileCanCu(newTask);
-      let finalTrangThai = newTask.trangThai;
-      if (newTask.sanPham && newTask.sanPham.trim() !== '') {
-        if (!finalTrangThai || finalTrangThai === 'Chưa hoàn thành') {
-          finalTrangThai = 'Hoàn thành đúng hạn';
-        }
-      }
-      const item: TaskBC = {
-        ...newTask,
-        trangThai: finalTrangThai,
-        id: nextId,
-        stt: maxStt + 1,
-        canCu: compiledCanCu
-      };
-
-      let updatedState = { ...prev };
-      updatedState[section] = [...list, item];
-
-      // If adding in Section B and it is recurring, auto-add to Section C as well
-      const isRecurring = newTask.kieuThoiHan === 'truoc_ngay_hang_thang' || newTask.kieuThoiHan === 'hang_nam';
-      if (section === 'B' && isRecurring) {
-        const listC = prev.C;
-        const existsInC = listC.some(t => t.noiDung === newTask.noiDung);
-        if (!existsInC) {
-          const maxSttC = listC.reduce((max, t) => t.stt > max ? t.stt : max, 0);
-          const nextIdC = `C${listC.length + 1}_${Date.now().toString().slice(-4)}`;
-          const itemC: TaskBC = {
-            ...newTask,
-            id: nextIdC,
-            stt: maxSttC + 1,
-            canCu: compiledCanCu
-          };
-          updatedState.C = [...listC, itemC];
-        }
-      }
-
-      return updatedState;
-    });
-  };
+  const {
+    state, isLoading, showSaveToast, saveError, taskCounts,
+    needsAuth, authUser, logout,
+    updateMeta, updateHiddenSidebarItems, updateStatusA, updateTaskBC,
+    addTaskBC, deleteTaskBC, updateTaskD, handleImportState, resetToDefault,
+  } = useAppState();
+
+  const { daysSinceBackup, setDaysSinceBackup, shouldShowReminder, dismissBackupReminder, setBackupReminderDismissed } = useBackupReminder();
+
+  const {
+    showSectionI_IV, handleToggleSectionI_IV,
+    sidebarCollapsed, setSidebarCollapsed,
+    workspaceExpanded, setWorkspaceExpanded,
+    viewModeB, handleSetViewModeB,
+    viewModeC, handleSetViewModeC,
+    viewModeBC, handleSetViewModeBC,
+    viewModeD, handleSetViewModeD,
+  } = useViewPreferences();
+
+  const {
+    isGlobalAddOpen, setIsGlobalAddOpen, targetSection,
+    loaiVanBan, setLoaiVanBan, so, ngay, setNgay,
+    quickDate, setQuickDate, quickDateHetHan, setQuickDateHetHan,
+    donViBanHanh, setDonViBanHanh, trichYeu, setTrichYeu,
+    noiDung, setNoiDung, thoiHan, setThoiHan, diemGiao, setDiemGiao,
+    donVi, setDonVi, sanPham, setSanPham, ngayHetHan, setNgayHetHan,
+    gioHetHan, setGioHetHan, kieuThoiHan, setKieuThoiHan,
+    donViTheoDoi, setDonViTheoDoi, ghiChu, setGhiChu,
+    danhSachMoc, setDanhSachMoc, isExpanded, setIsExpanded,
+    soNumberOnly, soSymbolOnly, selectedDeptCode, isFromCAT,
+    handleDocTypeChange, handleDeptCodeChange, handleCATToggle,
+    handleSoNumberChange, handleSymbolKeyDown, handleSoSymbolManualChange,
+    handleFullSoChange, handleOpenGlobalAdd, buildTaskPayload,
+  } = useGlobalAddTaskForm();
 
   // Handle saving task from the central, global add modal
   const handleGlobalSaveTask = (e: React.FormEvent) => {
     e.preventDefault();
-
-    const finalNgayHetHan = ngayHetHan || getTodayDateString();
-    const finalThoiHan = compileThoiHanString(kieuThoiHan, finalNgayHetHan, gioHetHan, thoiHan);
-
-    // Auto-detect recurring logic for custom input
-    let finalKieuThoiHan = kieuThoiHan;
-    if (kieuThoiHan === 'custom') {
-      const isRecur = isRecurringText(thoiHan);
-      finalKieuThoiHan = isRecur ? 'custom_c' : 'custom';
-    }
-
-    // Determine final section: if recurring type or custom recurring text
-    const isRecurring = finalKieuThoiHan === 'truoc_ngay_hang_thang' || finalKieuThoiHan === 'hang_nam' || finalKieuThoiHan === 'custom_c';
-    const finalSection = isRecurring ? 'C' : 'B';
-
-    // If both number and symbol are blank, do not auto-fill default symbol
-    const computedSymbol = soSymbolOnly ? (soSymbolOnly.startsWith('/') ? soSymbolOnly : `/${soSymbolOnly}`) : '';
-    const fallbackSo = soNumberOnly
-      ? `${soNumberOnly}${computedSymbol}`
-      : computedSymbol;
-    const finalSo = so.trim() || fallbackSo;
-
-    const finalNgay = ngay || getTodayDateString();
-
-    const taskData = {
-      canCu: '',
-      loaiVanBan,
-      so: finalSo,
-      ngay: finalNgay,
-      donViBanHanh,
-      trichYeu,
-      noiDung,
-      thoiHan: finalThoiHan,
-      diemGiao,
-      donVi,
-      sanPham,
-      ngayHetHan: finalNgayHetHan,
-      trangThai: '' as const, // Initially empty/pending status
-      gioHetHan,
-      kieuThoiHan: finalKieuThoiHan,
-      donViTheoDoi: donViTheoDoi || donViBanHanh,
-      ghiChu,
-      danhSachMoc: (danhSachMoc && danhSachMoc.length > 0) ? danhSachMoc : [
-        {
-          id: `moc_1_${Date.now()}`,
-          tenMoc: 'Mốc 1',
-          kieuThoiHan: finalKieuThoiHan || 'truoc_ngay',
-          ngayHetHan: finalNgayHetHan,
-          trangThai: 'Chưa hoàn thành'
-        }
-      ]
-    };
-
-    addTaskBC(finalSection, taskData);
+    const { finalSection, payload } = buildTaskPayload();
+    addTaskBC(finalSection, payload);
     setIsGlobalAddOpen(false);
-  };
-
-  // Delete task for Sections B and C
-  const deleteTaskBC = (section: 'B' | 'C', idx: number) => {
-    setState(prev => {
-      const list = [...prev[section]];
-      list.splice(idx, 1);
-      const updatedList = list.map((t, i) => ({
-        ...t,
-        stt: i + 1
-      }));
-      return {
-        ...prev,
-        [section]: updatedList
-      };
-    });
-  };
-
-  // Update task fields for Section D
-  const updateTaskD = (idx: number, field: keyof TaskD, value: any) => {
-    setState(prev => {
-      const copy = [...prev.D];
-      copy[idx] = { ...copy[idx], [field]: value };
-      return { ...prev, D: copy };
-    });
-  };
-
-  // Import entire new state from Excel
-  const handleImportState = (newState: AppState) => {
-    const migratedState = {
-      ...newState,
-      B: migrateTasks(newState.B || []),
-      C: migrateTasks(newState.C || [])
-    };
-    setState(migratedState);
-  };
-
-  // Reset to initial seed state
-  const resetToDefault = () => {
-    setState({
-      meta: {
-        donVi: 'Công an xã Nâm Nung',
-        thang: '07/2026'
-      },
-      A: SEED_A,
-      B: migrateTasks(SEED_B),
-      C: migrateTasks(SEED_C),
-      D: SEED_D
-    });
   };
 
   // Utility to calculate days until deadline relative to 2026-07-14 reference date
@@ -863,14 +123,6 @@ export default function App() {
     const diffTime = deadline.getTime() - today.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
-  };
-
-  // Compile counts for sidebar badges
-  const taskCounts = {
-    A: state.A?.length || 0,
-    B: state.B?.length || 0,
-    C: state.C?.length || 0,
-    D: state.D?.filter(t => t.type === 'item').length || 0
   };
 
   // Render correct tab view content
@@ -991,6 +243,8 @@ export default function App() {
           <Settings
             hiddenItems={state.hiddenSidebarItems || []}
             updateHiddenItems={updateHiddenSidebarItems}
+            authUser={authUser}
+            onLogout={logout}
           />
         );
       default:
@@ -1002,11 +256,19 @@ export default function App() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#f4f2ec]">
         <div className="text-center">
+          <div className="mx-auto mb-4 w-10 h-10 rounded-full border-4 border-[#0f2444]/15 border-t-[#0f2444] animate-spin" />
           <p className="text-lg font-semibold text-[#0f2444]">Đang tải dữ liệu...</p>
           <p className="text-sm text-slate-500">Vui lòng chờ trong giây lát.</p>
         </div>
       </div>
     );
+  }
+
+  // A backend (`node server.js`) was detected but no valid session is held —
+  // require login before showing app data. Plain `npm run dev`/`npm start`
+  // never sets this, so the app behaves exactly as before in that mode.
+  if (needsAuth) {
+    return <Login />;
   }
 
   return (
@@ -1145,11 +407,7 @@ export default function App() {
 
         {(() => {
           const hasData = state.A.length + state.B.length + state.C.length + state.D.length > 0;
-          const shouldShowBackupReminder =
-            hasData &&
-            !backupReminderDismissed &&
-            !isBackupSnoozed() &&
-            (daysSinceBackup === null || daysSinceBackup >= BACKUP_REMINDER_THRESHOLD_DAYS);
+          const shouldShowBackupReminder = hasData && shouldShowReminder;
 
           if (!shouldShowBackupReminder) return null;
 
@@ -1260,15 +518,7 @@ export default function App() {
                       className="w-full sm:w-auto flex-1 bg-white border border-slate-300 focus:border-[#a3212e] focus:bg-white text-[#0f2444] font-bold px-2 py-1 rounded text-xs outline-none transition shadow-2xs font-mono"
                       placeholder="Ví dụ: 439/KH-CAT-PV01"
                       value={so || (soNumberOnly ? `${soNumberOnly}${soSymbolOnly}` : soSymbolOnly)}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSo(val);
-                        const parsedFull = parseDocumentNumber(val);
-                        setSoNumberOnly(parsedFull.numberOnly);
-                        setSoSymbolOnly(parsedFull.symbolOnly);
-                        const parsedTwoWay = parseDocumentSymbolTwoWay(parsedFull.symbolOnly);
-                        applyTwoWayParsedResult(parsedTwoWay.detectedLoaiVanBan, parsedTwoWay.detectedIsFromCAT, parsedTwoWay.detectedDeptCode);
-                      }}
+                      onChange={(e) => handleFullSoChange(e.target.value)}
                     />
                   </div>
 
@@ -1668,6 +918,15 @@ export default function App() {
         <CheckCircle className="w-4 h-4 text-emerald-400" />
         <span>Tự động lưu...</span>
       </div>
+
+      {/* Persistent banner shown when auto-save is failing — this is the app's
+          only source of truth, so the user must know if it's not saving. */}
+      {saveError && (
+        <div className="fixed bottom-6 left-6 right-6 md:left-auto md:right-6 md:max-w-md bg-red-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-start gap-3 text-sm font-medium z-50">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <span>{saveError}</span>
+        </div>
+      )}
     </div>
   );
 }

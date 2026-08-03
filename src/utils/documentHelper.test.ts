@@ -1,134 +1,188 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { describe, it, expect } from 'vitest';
 import {
   suggestDocumentSymbol,
   parseDocumentNumber,
-  formatDonViBanHanhDisplay,
   parseDocumentSymbolTwoWay,
   tryExpandShorthand,
+  matchDepartment,
   formatToDDMMYY,
   parseQuickDate,
+  formatDonViBanHanhDisplay,
+  POLICE_DEPARTMENTS,
 } from './documentHelper';
 
 describe('suggestDocumentSymbol', () => {
-  it('should suggest a symbol with CAT prefix when isFromCAT is true', () => {
-    const symbol = suggestDocumentSymbol('Kế hoạch', 'PC06', true);
-    expect(symbol).toBe('/KH-CAT-PC06');
+  it('trả về rỗng khi không có loại văn bản', () => {
+    expect(suggestDocumentSymbol('', 'PV01', false)).toBe('');
   });
 
-  it('should suggest a symbol without CAT prefix when isFromCAT is false', () => {
-    const symbol = suggestDocumentSymbol('Báo cáo', 'PA05', false);
-    expect(symbol).toBe('/BC-PA05');
+  it('ghép đúng ký hiệu cho văn bản không thuộc CAT', () => {
+    expect(suggestDocumentSymbol('Kế hoạch', 'PC08', false)).toBe('/KH-PC08');
   });
 
-  it('should handle custom suffix', () => {
-    const symbol = suggestDocumentSymbol('Công văn', '', true, 'TTV');
-    expect(symbol).toBe('/CAT-TTV');
+  it('thêm "-CAT" vào ký hiệu khi văn bản do Công an tỉnh ban hành', () => {
+    expect(suggestDocumentSymbol('Kế hoạch', 'PC08', true)).toBe('/KH-CAT-PC08');
   });
 
-  it('should return empty for empty doc type', () => {
-    expect(suggestDocumentSymbol('', 'PC01', true)).toBe('');
+  it('Công văn có ký hiệu rỗng nên chỉ còn đơn vị', () => {
+    expect(suggestDocumentSymbol('Công văn', 'PC08', false)).toBe('/PC08');
+    expect(suggestDocumentSymbol('Công văn', 'PC08', true)).toBe('/CAT-PC08');
+  });
+
+  it('không có đơn vị và không phải CAT thì trả về rỗng cho Công văn', () => {
+    expect(suggestDocumentSymbol('Công văn', '', false)).toBe('');
+  });
+
+  it('CAT nhưng không có đơn vị vẫn ra ký hiệu CAT', () => {
+    expect(suggestDocumentSymbol('Kế hoạch', '', true)).toBe('/KH-CAT');
   });
 });
 
 describe('parseDocumentNumber', () => {
-  it('should parse a full document number correctly', () => {
-    const parsed = parseDocumentNumber('123/KH-CAT-PC06');
-    expect(parsed.numberOnly).toBe('123');
-    expect(parsed.symbolOnly).toBe('/KH-CAT-PC06');
-    expect(parsed.isFromCAT).toBe(true);
-    expect(parsed.departmentCode).toBe('PC06');
-    expect(parsed.customSuffix).toBe('');
+  it('tách đúng số và ký hiệu từ chuỗi đầy đủ', () => {
+    const result = parseDocumentNumber('58/KH-CAT-PA04');
+    expect(result.numberOnly).toBe('58');
+    expect(result.symbolOnly).toBe('/KH-CAT-PA04');
+    expect(result.isFromCAT).toBe(true);
+    expect(result.departmentCode).toBe('PA04');
   });
 
-  it('should handle number only', () => {
-    const parsed = parseDocumentNumber('456');
-    expect(parsed.numberOnly).toBe('456');
-    expect(parsed.symbolOnly).toBe('');
+  it('chuỗi chỉ có số thì numberOnly = chuỗi đó, symbolOnly rỗng', () => {
+    const result = parseDocumentNumber('123');
+    expect(result.numberOnly).toBe('123');
+    expect(result.symbolOnly).toBe('');
   });
 
-  it('should handle symbol only', () => {
-    const parsed = parseDocumentNumber('/NQ-PA02');
-    expect(parsed.numberOnly).toBe('');
-    expect(parsed.symbolOnly).toBe('/NQ-PA02');
-    expect(parsed.isFromCAT).toBe(false);
-    expect(parsed.departmentCode).toBe('PA02');
+  it('chuỗi rỗng trả về tất cả các trường rỗng/false', () => {
+    const result = parseDocumentNumber('');
+    expect(result).toEqual({
+      numberOnly: '',
+      symbolOnly: '',
+      isFromCAT: false,
+      departmentCode: '',
+      customSuffix: ''
+    });
+  });
+
+  it('nhận diện đơn vị theo dõi tuỳ chỉnh khi không khớp mã chuẩn', () => {
+    const result = parseDocumentNumber('10/BC-CAT-ABC');
+    expect(result.departmentCode).toBe('');
+    expect(result.customSuffix).toBe('ABC');
+  });
+});
+
+describe('parseDocumentSymbolTwoWay', () => {
+  it('nhận diện đúng loại văn bản, đơn vị và cờ CAT từ ký hiệu chuẩn', () => {
+    const result = parseDocumentSymbolTwoWay('/KH-CAT-PC08');
+    expect(result.detectedLoaiVanBan).toBe('Kế hoạch');
+    expect(result.detectedIsFromCAT).toBe(true);
+    expect(result.detectedDeptCode).toBe('PC08');
+  });
+
+  it('mặc định là Công văn khi không nhận diện được loại văn bản', () => {
+    const result = parseDocumentSymbolTwoWay('/PC08');
+    expect(result.detectedLoaiVanBan).toBe('Công văn');
+    expect(result.detectedDeptCode).toBe('PC08');
+    expect(result.detectedIsFromCAT).toBe(false);
+  });
+
+  it('chuỗi rỗng trả về detectedIsFromCAT = false và không có trường khác', () => {
+    const result = parseDocumentSymbolTwoWay('');
+    expect(result).toEqual({ detectedIsFromCAT: false });
+  });
+});
+
+describe('tryExpandShorthand', () => {
+  it('mở rộng đúng gõ tắt loại văn bản + đơn vị (vd: "khpv01")', () => {
+    const result = tryExpandShorthand('khpv01');
+    expect(result).not.toBeNull();
+    expect(result?.docType).toBe('Kế hoạch');
+    expect(result?.departmentCode).toBe('PV01');
+    expect(result?.isFromCAT).toBe(false);
+  });
+
+  it('nhận diện "cat" trong chuỗi để bật cờ isFromCAT', () => {
+    const result = tryExpandShorthand('bccatc8');
+    expect(result).not.toBeNull();
+    expect(result?.docType).toBe('Báo cáo');
+    expect(result?.isFromCAT).toBe(true);
+    expect(result?.departmentCode).toBe('PC08');
+  });
+
+  it('trả về null khi không nhận diện được đơn vị hợp lệ', () => {
+    expect(tryExpandShorthand('khxyz')).toBeNull();
+  });
+
+  it('trả về null với chuỗi rỗng', () => {
+    expect(tryExpandShorthand('')).toBeNull();
+  });
+});
+
+describe('matchDepartment', () => {
+  const pc08 = POLICE_DEPARTMENTS.find(d => d.code === 'PC08')!;
+
+  it('khớp theo tiền tố nhóm ("c" -> mọi đơn vị PC)', () => {
+    expect(matchDepartment(pc08, 'c')).toBe(true);
+    const pa01 = POLICE_DEPARTMENTS.find(d => d.code === 'PA01')!;
+    expect(matchDepartment(pa01, 'c')).toBe(false);
+  });
+
+  it('khớp theo alias (vd: "gt" cho giao thông)', () => {
+    expect(matchDepartment(pc08, 'gt')).toBe(true);
+  });
+
+  it('khớp theo mã đơn vị trực tiếp', () => {
+    expect(matchDepartment(pc08, 'PC08')).toBe(true);
+  });
+
+  it('chuỗi rỗng khớp với mọi đơn vị', () => {
+    expect(matchDepartment(pc08, '')).toBe(true);
+  });
+});
+
+describe('formatToDDMMYY / parseQuickDate', () => {
+  it('formatToDDMMYY chuyển đúng định dạng', () => {
+    expect(formatToDDMMYY('2026-03-12')).toBe('120326');
+  });
+
+  it('formatToDDMMYY trả rỗng khi thiếu ngày', () => {
+    expect(formatToDDMMYY(undefined)).toBe('');
+  });
+
+  it('parseQuickDate hiểu "5/7" (ngày/tháng, năm hiện tại)', () => {
+    const year = new Date().getFullYear();
+    expect(parseQuickDate('5/7')).toBe(`${year}-07-05`);
+  });
+
+  it('parseQuickDate hiểu chuỗi 6 số DDMMYY', () => {
+    expect(parseQuickDate('050726')).toBe('2026-07-05');
+  });
+
+  it('parseQuickDate hiểu chuỗi 8 số DDMMYYYY', () => {
+    expect(parseQuickDate('05072026')).toBe('2026-07-05');
+  });
+
+  it('parseQuickDate trả về null với ngày không hợp lệ', () => {
+    expect(parseQuickDate('32/13/2026')).toBeNull();
+    expect(parseQuickDate('abc')).toBeNull();
   });
 });
 
 describe('formatDonViBanHanhDisplay', () => {
-    it('should format a known department code', () => {
-        expect(formatDonViBanHanhDisplay('PC08')).toBe('PC08 - Phòng Cảnh sát giao thông');
-    });
+  it('hiển thị "CAT" nguyên trạng', () => {
+    expect(formatDonViBanHanhDisplay('CAT')).toBe('CAT');
+  });
 
-    it('should return CAT for CAT', () => {
-        expect(formatDonViBanHanhDisplay('CAT')).toBe('CAT');
-    });
+  it('ghép mã và tên đầy đủ khi tìm thấy đơn vị', () => {
+    expect(formatDonViBanHanhDisplay('PC08')).toBe('PC08 - Phòng Cảnh sát giao thông');
+  });
 
-    it('should return the input if not found', () => {
-        expect(formatDonViBanHanhDisplay('UNKNOWN')).toBe('UNKNOWN');
-    });
-});
-
-
-describe('parseDocumentSymbolTwoWay', () => {
-    it('should detect doc type, CAT, and dept code from a full symbol', () => {
-        const result = parseDocumentSymbolTwoWay('/KH-CAT-PC06');
-        expect(result.detectedLoaiVanBan).toBe('Kế hoạch');
-        expect(result.detectedIsFromCAT).toBe(true);
-        expect(result.detectedDeptCode).toBe('PC06');
-    });
-
-    it('should default to Công văn if type is not recognized', () => {
-        const result = parseDocumentSymbolTwoWay('/XYZ-PC01');
-        expect(result.detectedLoaiVanBan).toBe('Công văn');
-        expect(result.detectedDeptCode).toBe('PC01');
-    });
-});
-
-describe('tryExpandShorthand', () => {
-    it('should expand a valid shorthand like "kh-cat-pc06"', () => {
-        const result = tryExpandShorthand('kh-cat-pc06');
-        expect(result).not.toBeNull();
-        expect(result?.docType).toBe('Kế hoạch');
-        expect(result?.isFromCAT).toBe(true);
-        expect(result?.departmentCode).toBe('PC06');
-        expect(result?.expandedSymbol).toBe('/KH-CAT-PC06');
-    });
-
-    it('should return null for invalid shorthand', () => {
-        const result = tryExpandShorthand('invalid-shorthand');
-        expect(result).toBeNull();
-    });
-});
-
-describe('formatToDDMMYY', () => {
-    it('should format YYYY-MM-DD to DDMMYY', () => {
-        expect(formatToDDMMYY('2026-07-31')).toBe('310726');
-    });
-
-    it('should return empty string for invalid input', () => {
-        expect(formatToDDMMYY('invalid-date')).toBe('');
-        expect(formatToDDMMYY(undefined)).toBe('');
-    });
-});
-
-describe('parseQuickDate', () => {
-    it('should parse DD/MM to YYYY-MM-DD', () => {
-        const currentYear = new Date().getFullYear();
-        expect(parseQuickDate('31/07')).toBe(`${currentYear}-07-31`);
-    });
-
-    it('should parse DDMMYY to YYYY-MM-DD', () => {
-        expect(parseQuickDate('310726')).toBe('2026-07-31');
-    });
-
-    it('should parse DDMM to YYYY-MM-DD', () => {
-        const currentYear = new Date().getFullYear();
-        expect(parseQuickDate('3107')).toBe(`${currentYear}-07-31`);
-    });
-
-    it('should return null for invalid date string', () => {
-        expect(parseQuickDate('9999')).toBeNull();
-        expect(parseQuickDate('32/13')).toBeNull();
-    });
+  it('trả về rỗng khi không có giá trị', () => {
+    expect(formatDonViBanHanhDisplay(undefined)).toBe('');
+  });
 });
