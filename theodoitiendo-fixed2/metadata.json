@@ -1,0 +1,8 @@
+{
+  "name": "RM4: Hồ sơ tác nghiệp Công an cấp xã",
+  "description": "Ứng dụng chấm điểm và theo dõi tiến độ công việc, tích hợp chế độ Lịch (Calendar) và bảng Kanban.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
