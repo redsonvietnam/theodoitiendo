@@ -98,6 +98,54 @@
             border-color: var(--brand);
         }
 
+        /* ---------- Source toggle (IndexedDB vs Backend SQLite) ---------- */
+        .source-toggle {
+            display: flex;
+            gap: 6px;
+            flex: 0 0 auto;
+        }
+
+        .source-toggle button {
+            height: 34px;
+            padding: 0 12px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            background: var(--surface);
+            color: var(--ink-soft);
+            font-size: 11px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .source-toggle button .src-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--line-strong);
+            flex: 0 0 auto;
+        }
+
+        .source-toggle button:hover:not(.active) {
+            border-color: var(--brand);
+            color: var(--brand);
+        }
+
+        .source-toggle button.active {
+            background: var(--brand);
+            border-color: var(--brand);
+            color: #fff;
+        }
+
+        .source-toggle button.active .src-dot {
+            background: #fff;
+        }
+
         /* ---------- Card ---------- */
         .card {
             background: var(--surface);
@@ -839,6 +887,16 @@
             color: var(--ref-fg);
         }
 
+        .readonly-note {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--ink-faint);
+            background: var(--surface-2);
+            border: 1px dashed var(--line-strong);
+            border-radius: 6px;
+            padding: 4px 10px;
+        }
+
         .empty-state {
             text-align: center;
             padding: 20px;
@@ -879,6 +937,14 @@
                 </svg>
                 <input type="text" class="search-box" placeholder="Tìm kiếm số hiệu, nội dung, đơn vị..."
                     id="indexeddb-search" oninput="filterIndexedDB()">
+            </div>
+            <div class="source-toggle" id="source-toggle">
+                <button type="button" class="active" data-src="idb" onclick="switchViewSource('idb', this)">
+                    <span class="src-dot"></span>IndexedDB (local)
+                </button>
+                <button type="button" data-src="backend" onclick="switchViewSource('backend', this)">
+                    <span class="src-dot"></span>Backend (SQLite qua API)
+                </button>
             </div>
             <button class="btn" onclick="location.reload()">↻ Refresh</button>
         </div>
@@ -1037,7 +1103,7 @@
             return '<div class="edit-field' + (f.wide ? ' wide' : '') + '"><span class="detail-label">' + esc(f.label) + '</span>' + input + '</div>';
         }
 
-        function renderRowPairInner(item, section, todayISO, editing) {
+        function renderRowPairInner(item, section, todayISO, editing, readOnly) {
             const uid = item.__uid;
             const targetDate = item.ngayHetHan || '';
             const statusText = item.trangThai || '';
@@ -1065,10 +1131,14 @@
             html += '<div class="cell">';
 
             if (!editing) {
-                html += '<div class="action-bar">';
-                html += '<button type="button" class="row-btn edit" onclick="event.stopPropagation(); editItem(\'' + esc(uid) + '\', \'' + esc(section) + '\')">✎ Sửa</button>';
-                html += '<button type="button" class="row-btn delete" onclick="event.stopPropagation(); deleteItem(\'' + esc(uid) + '\', \'' + esc(section) + '\')">🗑 Xóa</button>';
-                html += '</div>';
+                if (readOnly) {
+                    html += '<div class="action-bar"><span class="readonly-note">🔒 Chỉ xem — nguồn dữ liệu này không cho sửa trực tiếp</span></div>';
+                } else {
+                    html += '<div class="action-bar">';
+                    html += '<button type="button" class="row-btn edit" onclick="event.stopPropagation(); editItem(\'' + esc(uid) + '\', \'' + esc(section) + '\')">✎ Sửa</button>';
+                    html += '<button type="button" class="row-btn delete" onclick="event.stopPropagation(); deleteItem(\'' + esc(uid) + '\', \'' + esc(section) + '\')">🗑 Xóa</button>';
+                    html += '</div>';
+                }
                 html += detailField('Số hiệu', item.so, 'ref-value');
                 html += detailField('Loại VB', item.loaiVanBan);
                 html += detailField('Căn cứ', item.canCu);
@@ -1223,6 +1293,7 @@
             const donViFilter = document.getElementById('filter-donvi').value;
             const kieuFilter = document.getElementById('filter-kieuthoihan').value;
             const today = new Date().toISOString().split('T')[0];
+            const readOnly = viewSource !== 'idb';
             let html = '';
 
             renderChips();
@@ -1259,7 +1330,7 @@
                     html += '<div class="info-bar" style="margin-bottom:4px;">' + s.label + ' — ' + items.length + ' mục</div>';
                     html += renderTableHeader();
                     items.forEach((item) => {
-                        html += '<div class="row-pair" data-uid="' + esc(item.__uid) + '">' + renderRowPairInner(item, s.key, today, editingUids.has(item.__uid)) + '</div>';
+                        html += '<div class="row-pair" data-uid="' + esc(item.__uid) + '">' + renderRowPairInner(item, s.key, today, editingUids.has(item.__uid), readOnly) + '</div>';
                     });
                 } else {
                     html += '<div class="empty-state">Không tìm thấy trong ' + s.label + '</div>';
@@ -1311,7 +1382,7 @@
             const pair = document.querySelector('.row-pair[data-uid="' + CSS.escape(uid) + '"]');
             if (!pair || !item) return;
             const today = new Date().toISOString().split('T')[0];
-            pair.innerHTML = renderRowPairInner(item, section, today, editingUids.has(uid));
+            pair.innerHTML = renderRowPairInner(item, section, today, editingUids.has(uid), false);
             if (keepOpen) {
                 const detail = pair.querySelector('.detail-row');
                 const row = pair.querySelector('.table-row');
@@ -1402,8 +1473,13 @@
                 const res = await fetch('/api/state', { headers: { Authorization: 'Bearer ' + token } });
                 if (res.status === 401) return { ok: false, reason: 'unauthorized' };
                 if (!res.ok) return { ok: false, reason: 'error' };
-                const data = await res.json();
-                return { ok: true, updatedAt: data.updatedAt };
+                const payload = await res.json();
+                // Route /api/state có thể trả thẳng AppState (có key A/B/C/D) hoặc bọc { data, updatedAt }.
+                const looksLikeAppState = payload && (payload.A || payload.B || payload.C || payload.D);
+                if (looksLikeAppState) {
+                    return { ok: true, data: payload, updatedAt: null };
+                }
+                return { ok: true, data: payload.data || null, updatedAt: payload.updatedAt || null };
             } catch {
                 return { ok: false, reason: 'network' };
             }
@@ -1431,16 +1507,16 @@
             const panel = document.getElementById('status-panel');
             const items = [];
 
-            // 1. IndexedDB — luôn là tầng đang hiển thị trên trang này
+            // 1. IndexedDB — luôn là tầng đang hiển thị trên trang này khi ở chế độ 'idb'
             const idbCount = currentIndexedDBData ? getAllItems().length : 0;
             items.push(statusItemHtml('🟢', 'IndexedDB (trình duyệt)',
-                idbCount + ' mục — đây là dữ liệu bạn đang xem trên trang này', 'ok'));
+                idbCount + ' mục — dữ liệu chính app đang dùng', 'ok'));
 
             // 2. Backend SQLite
             const healthy = await checkBackendHealth();
             if (!healthy) {
-                items.push(statusItemHtml('🔴', 'Backend SQLite',
-                    'Không kết nối được — cần chạy "npm run backend" trên máy chủ', 'off'));
+                items.push(statusItemHtml('⚪', 'Backend SQLite',
+                    'Không kết nối được — bình thường nếu bạn chỉ chạy "npm run dev" (chưa bật LAN)', 'unknown'));
             } else {
                 const state = await fetchBackendState();
                 if (state.ok) {
@@ -1475,10 +1551,6 @@
                 items.push(statusItemHtml('🟢', 'Excel Backup', excel.days + ' ngày trước', 'ok'));
             }
 
-            // 4. Tầng backup toàn project (backup-server.cjs / tar.gz) — chưa xác minh được cơ chế
-            items.push(statusItemHtml('⚪', 'Backup toàn project (tar.gz)',
-                'Chưa xác minh được cơ chế — cần đọc backup-server.cjs / restore.js để hiển thị chính xác', 'unknown'));
-
             panel.innerHTML = items.join('');
         }
 
@@ -1489,6 +1561,40 @@
                 body.classList.toggle('open');
                 btn.classList.toggle('active');
             }
+        }
+
+        let viewSource = 'idb'; // 'idb' | 'backend'
+
+        function renderFullTable(data) {
+            const result = document.getElementById('indexeddb-result');
+            assignUids(data);
+            currentIndexedDBData = data;
+            populateFilterOptions();
+            renderChips();
+            const today = new Date().toISOString().split('T')[0];
+            const readOnly = viewSource !== 'idb';
+
+            let html = '<div class="section-toggle">';
+            sectionConfig.forEach(s => {
+                html += '<button class="' + (s.defaultOpen ? 'active' : '') + '" data-section="' + s.key + '" onclick="toggleSection(this)">' + s.label + '</button>';
+            });
+            html += '</div>';
+
+            sectionConfig.forEach(s => {
+                const items = data[s.key] || [];
+                html += '<div class="section-body ' + (s.defaultOpen ? 'open' : '') + '" data-section="' + s.key + '">';
+                if (items.length > 0) {
+                    html += renderTableHeader();
+                    items.forEach((item) => {
+                        html += '<div class="row-pair" data-uid="' + esc(item.__uid) + '">' + renderRowPairInner(item, s.key, today, false, readOnly) + '</div>';
+                    });
+                } else {
+                    html += '<div class="empty-state">Không có dữ liệu</div>';
+                }
+                html += '</div>';
+            });
+
+            result.innerHTML = html;
         }
 
         async function loadIndexedDB() {
@@ -1514,36 +1620,41 @@
                     result.innerHTML = '<div class="info-bar">ℹ️ IndexedDB trống.</div>';
                     return;
                 }
-                assignUids(data);
-                currentIndexedDBData = data;
-                populateFilterOptions();
-                renderChips();
-                const today = new Date().toISOString().split('T')[0];
-
-                let html = '<div class="section-toggle">';
-                sectionConfig.forEach(s => {
-                    html += '<button class="' + (s.defaultOpen ? 'active' : '') + '" data-section="' + s.key + '" onclick="toggleSection(this)">' + s.label + '</button>';
-                });
-                html += '</div>';
-
-                sectionConfig.forEach(s => {
-                    const items = data[s.key] || [];
-                    html += '<div class="section-body ' + (s.defaultOpen ? 'open' : '') + '" data-section="' + s.key + '">';
-                    if (items.length > 0) {
-                        html += renderTableHeader();
-                        items.forEach((item) => {
-                            html += '<div class="row-pair" data-uid="' + esc(item.__uid) + '">' + renderRowPairInner(item, s.key, today, false) + '</div>';
-                        });
-                    } else {
-                        html += '<div class="empty-state">Không có dữ liệu</div>';
-                    }
-                    html += '</div>';
-                });
-
-                result.innerHTML = html;
+                renderFullTable(data);
             } catch (e) {
                 result.innerHTML = '<div class="info-bar" style="background:#fee2e2;color:#991b1b;">❌ Lỗi: ' + esc(e.message) + '</div>';
             }
+        }
+
+        async function loadBackendSource() {
+            const result = document.getElementById('indexeddb-result');
+            result.innerHTML = '<div class="info-bar">⏳ Đang tải từ Backend SQLite...</div>';
+            const healthy = await checkBackendHealth();
+            if (!healthy) {
+                result.innerHTML = '<div class="info-bar" style="background:#fee2e2;color:#991b1b;">❌ Không kết nối được Backend. Nếu bạn chỉ chạy "npm run dev" thì backend không bật — chạy "npm start" nếu muốn xem/chia sẻ qua LAN.</div>';
+                return;
+            }
+            const state = await fetchBackendState();
+            if (!state.ok) {
+                const msg = state.reason === 'no-token' || state.reason === 'unauthorized'
+                    ? 'Chưa đăng nhập trong ứng dụng chính nên không đọc được dữ liệu server.'
+                    : 'Không đọc được dữ liệu từ Backend.';
+                result.innerHTML = '<div class="info-bar" style="background:#fee2e2;color:#991b1b;">❌ ' + esc(msg) + '</div>';
+                return;
+            }
+            if (!state.data) {
+                result.innerHTML = '<div class="info-bar">ℹ️ Backend chưa có dữ liệu nào.</div>';
+                return;
+            }
+            renderFullTable(state.data);
+        }
+
+        function switchViewSource(src, btn) {
+            viewSource = src;
+            document.querySelectorAll('#source-toggle button').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            if (src === 'idb') loadIndexedDB();
+            else if (src === 'backend') loadBackendSource();
         }
 
         window.onload = function () {
