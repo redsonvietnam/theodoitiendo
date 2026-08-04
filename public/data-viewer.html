@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Viewer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
+
+        :root {
+            --bg: #eef1f6;
+            --surface: #ffffff;
+            --surface-2: #f6f7fb;
+            --ink: #16213a;
+            --ink-soft: #5b6478;
+            --ink-faint: #94a0b4;
+            --line: #e3e7ee;
+            --line-strong: #cdd4e0;
+            --brand: #2d3f6b;
+            --brand-soft: #eef0f8;
+
+            --ok-fg: #0f7a45;
+            --ok-bg: #e4f6ec;
+            --late-fg: #a3620a;
+            --late-bg: #fcefd9;
+            --overdue-fg: #b8362a;
+            --overdue-bg: #fbe8e6;
+            --pending-fg: #5b6478;
+            --pending-bg: #eef0f4;
+            --slate-fg: #98a2b3;
+            --slate-bg: #f2f3f6;
+
+            --ref-fg: #7a3ea1;
+            --ref-bg: #f3e9fa;
+            --ref-line: #d9bceb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            background-image:
+                linear-gradient(var(--line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--line) 1px, transparent 1px);
+            background-size: 28px 28px;
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 14px;
+            color: var(--ink);
+            font-size: 13px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ---------- Top bar: search + refresh, same row ---------- */
+        .topbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .topbar .search-wrapper {
+            flex: 1 1 auto;
+        }
+
+        .btn {
+            padding: 0 14px;
+            height: 34px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            background: var(--surface);
+            color: var(--brand);
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-family: inherit;
+            box-shadow: 0 1px 2px rgba(22, 33, 58, 0.05);
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
+
+        .btn:hover {
+            background: var(--brand-soft);
+            border-color: var(--brand);
+        }
+
+        /* ---------- Card ---------- */
+        .card {
+            background: var(--surface);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 2px rgba(22, 33, 58, 0.06);
+            border: 1px solid var(--line);
+        }
+
+        /* ---------- Search ---------- */
+        .search-wrapper {
+            position: relative;
+            min-width: 200px;
+        }
+
+        .search-wrapper svg {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--ink-faint);
+            pointer-events: none;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 7px 12px 7px 30px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+            background: var(--surface-2);
+            transition: border-color 0.15s, background 0.15s;
+            color: var(--ink);
+            height: 34px;
+        }
+
+        .search-box:focus {
+            border-color: var(--brand);
+            background: #fff;
+        }
+
+        .search-box::placeholder {
+            color: var(--ink-faint);
+        }
+
+        /* ---------- Quick filter chips ---------- */
+        .chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 11px;
+            border-radius: 999px;
+            border: 1.5px solid var(--line-strong);
+            background: var(--surface);
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.12s;
+            color: var(--ink-soft);
+        }
+
+        .chip .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+        }
+
+        .chip .count {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            opacity: 0.7;
+            font-size: 10px;
+        }
+
+        .chip:hover {
+            border-color: var(--brand);
+        }
+
+        .chip.active {
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .chip.active .count {
+            opacity: 0.85;
+        }
+
+        .chip[data-chip="overdue"].active {
+            background: var(--overdue-fg);
+        }
+
+        .chip[data-chip="late"].active {
+            background: var(--late-fg);
+        }
+
+        .chip[data-chip="urgent"].active {
+            background: var(--late-fg);
+        }
+
+        .chip[data-chip="ok"].active {
+            background: var(--ok-fg);
+        }
+
+        .chip[data-chip="completed"].active {
+            background: var(--ok-fg);
+        }
+
+        .chip[data-chip="pending"].active {
+            background: var(--pending-fg);
+        }
+
+        .chip[data-chip="overdue"] .dot {
+            background: var(--overdue-fg);
+        }
+
+        .chip[data-chip="late"] .dot {
+            background: var(--late-fg);
+        }
+
+        .chip[data-chip="urgent"] .dot {
+            background: var(--late-fg);
+        }
+
+        .chip[data-chip="ok"] .dot {
+            background: var(--ok-fg);
+        }
+
+        .chip[data-chip="completed"] .dot {
+            background: var(--ok-fg);
+        }
+
+        .chip[data-chip="pending"] .dot {
+            background: var(--pending-fg);
+        }
+
+        .chip.active .dot {
+            background: #fff !important;
+        }
+
+        /* ---------- Filter bar (dropdowns + date range) ---------- */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .toolbar-label {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: var(--ink-faint);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: -3px;
+        }
+
+        .filter-select {
+            flex: 0 1 150px;
+            min-width: 120px;
+            height: 32px;
+            padding: 0 10px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            font-size: 11.5px;
+            font-family: inherit;
+            background: var(--surface-2) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2394a0b4" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>') no-repeat right 8px center;
+            background-size: 13px;
+            appearance: none;
+            -webkit-appearance: none;
+            color: var(--ink);
+            cursor: pointer;
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+
+        .filter-select:focus {
+            border-color: var(--brand);
+            background-color: #fff;
+            outline: none;
+        }
+
+        .date-input {
+            height: 32px;
+            padding: 0 8px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--surface-2);
+            color: var(--ink);
+            width: 128px;
+        }
+
+        .date-input:focus {
+            border-color: var(--brand);
+            background: #fff;
+            outline: none;
+        }
+
+        .date-sep {
+            color: var(--ink-faint);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .filter-reset {
+            height: 32px;
+            padding: 0 12px;
+            border: 1px dashed var(--line-strong);
+            border-radius: 7px;
+            background: transparent;
+            color: var(--ink-soft);
+            font-size: 11px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .filter-reset:hover {
+            border-color: var(--overdue-fg);
+            color: var(--overdue-fg);
+        }
+
+        .collapse-all-btn {
+            height: 32px;
+            padding: 0 12px;
+            border: 1px solid var(--line-strong);
+            border-radius: 7px;
+            background: var(--surface-2);
+            color: var(--ink-soft);
+            font-size: 11px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+            margin-left: auto;
+        }
+
+        .collapse-all-btn:hover {
+            border-color: var(--brand);
+            color: var(--brand);
+            background: var(--brand-soft);
+        }
+
+        /* ---------- Storage status panel ---------- */
+        .status-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 7px;
+            font-size: 11px;
+            border: 1px solid var(--line);
+            background: var(--surface);
+        }
+
+        .status-item.ok {
+            border-left: 3px solid var(--ok-fg);
+        }
+
+        .status-item.warn {
+            border-left: 3px solid var(--late-fg);
+        }
+
+        .status-item.off {
+            border-left: 3px solid var(--overdue-fg);
+        }
+
+        .status-item.unknown {
+            border-left: 3px solid var(--slate-fg);
+        }
+
+        .status-item.loading {
+            color: var(--ink-faint);
+            font-style: italic;
+        }
+
+        .status-icon {
+            flex: 0 0 auto;
+            font-size: 12px;
+        }
+
+        .status-label {
+            flex: 0 0 auto;
+            font-weight: 700;
+            color: var(--ink);
+            min-width: 150px;
+        }
+
+        .status-detail {
+            flex: 1 1 auto;
+            color: var(--ink-soft);
+        }
+
+        /* ---------- Row actions (edit / delete / save / cancel) ---------- */
+        .action-bar {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+            margin-bottom: 8px;
+        }
+
+        .row-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 10.5px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.12s;
+        }
+
+        .row-btn.edit {
+            background: var(--brand-soft);
+            color: var(--brand);
+            border-color: var(--brand-soft);
+        }
+
+        .row-btn.edit:hover {
+            border-color: var(--brand);
+        }
+
+        .row-btn.delete {
+            background: var(--overdue-bg);
+            color: var(--overdue-fg);
+            border-color: var(--overdue-bg);
+        }
+
+        .row-btn.delete:hover {
+            border-color: var(--overdue-fg);
+        }
+
+        .row-btn.save {
+            background: var(--ok-fg);
+            color: #fff;
+        }
+
+        .row-btn.save:hover {
+            background: #0c6438;
+        }
+
+        .row-btn.cancel {
+            background: var(--surface);
+            color: var(--ink-soft);
+            border-color: var(--line-strong);
+        }
+
+        .row-btn.cancel:hover {
+            border-color: var(--ink-soft);
+        }
+
+        /* ---------- Edit form fields ---------- */
+        .edit-field {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .edit-field.wide {
+            grid-column: 1 / -1;
+        }
+
+        .edit-input {
+            font-family: inherit;
+            font-size: 11px;
+            padding: 5px 7px;
+            border: 1px solid var(--line-strong);
+            border-radius: 5px;
+            background: #fff;
+            color: var(--ink);
+            outline: none;
+            width: 100%;
+        }
+
+        .edit-input:focus {
+            border-color: var(--brand);
+        }
+
+        textarea.edit-input {
+            resize: vertical;
+            min-height: 40px;
+            font-family: inherit;
+        }
+
+        .info-bar {
+            font-size: 11px;
+            color: var(--ink-soft);
+            padding: 6px 10px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border: 1px dashed var(--line-strong);
+        }
+
+        /* ---------- Section toggle pills ---------- */
+        .section-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .section-toggle button {
+            padding: 5px 12px;
+            border: 1px solid var(--line-strong);
+            border-radius: 999px;
+            background: var(--surface);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--ink-soft);
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+
+        .section-toggle button.active {
+            background: var(--brand);
+            color: #fff;
+            border-color: var(--brand);
+        }
+
+        .section-toggle button:hover:not(.active) {
+            background: var(--brand-soft);
+            border-color: var(--brand);
+            color: var(--brand);
+        }
+
+        .section-body {
+            display: none;
+        }
+
+        .section-body.open {
+            display: block;
+        }
+
+        .section-body {
+            margin-bottom: 6px;
+        }
+
+        /* ---------- Table ---------- */
+        .table-row {
+            position: relative;
+            display: grid;
+            grid-template-columns: 74px 84px 108px 78px minmax(160px, 1fr) 110px 88px 30px;
+            gap: 8px;
+            align-items: center;
+            padding: 6px 8px 6px 12px;
+            border-bottom: 1px solid var(--line);
+            font-size: 11.5px;
+            transition: background 0.12s;
+            cursor: pointer;
+            background: var(--surface);
+        }
+
+        .table-row::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--slate-fg);
+            border-radius: 0 2px 2px 0;
+        }
+
+        .table-row.completed::before {
+            background: var(--ok-fg);
+        }
+
+        .table-row.late::before {
+            background: var(--late-fg);
+        }
+
+        .table-row.overdue::before {
+            background: var(--overdue-fg);
+        }
+
+        .table-row.overdue {
+            background: linear-gradient(90deg, var(--overdue-bg) 0%, transparent 14%);
+        }
+
+        .table-row.urgent-row {
+            background: linear-gradient(90deg, var(--late-bg) 0%, transparent 14%);
+        }
+
+        .table-row:hover {
+            background: var(--surface-2);
+        }
+
+        .table-row.overdue:hover {
+            background: linear-gradient(90deg, var(--overdue-bg) 0%, var(--surface-2) 60%);
+        }
+
+        .table-row.urgent-row:hover {
+            background: linear-gradient(90deg, var(--late-bg) 0%, var(--surface-2) 60%);
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .table-row.header-row {
+            font-weight: 700;
+            color: var(--ink-faint);
+            font-size: 9.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            border-bottom: 1px solid var(--line-strong);
+            padding: 6px 8px 6px 12px;
+            background: var(--surface-2);
+            cursor: default;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .table-row.header-row::before {
+            display: none;
+        }
+
+        .table-row.header-row:hover {
+            background: var(--surface-2);
+        }
+
+        .cell {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .cell.id {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: var(--brand);
+            font-size: 10.5px;
+            background: var(--brand-soft);
+            border-radius: 4px;
+            padding: 2px 5px;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .cell.status {
+            text-align: left;
+        }
+
+        .cell.ref {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10.5px;
+            font-weight: 800;
+            color: var(--ref-fg);
+            background: var(--ref-bg);
+            border: 1px solid var(--ref-line);
+            border-radius: 5px;
+            padding: 2px 6px;
+            display: inline-block;
+            width: fit-content;
+            letter-spacing: 0.2px;
+        }
+
+        .cell.date {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10.5px;
+            color: var(--ink-soft);
+        }
+
+        .cell.content {
+            color: var(--ink);
+        }
+
+        .cell.deadline {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            font-size: 10.5px;
+            padding: 2px 6px;
+            border-radius: 5px;
+        }
+
+        .cell.deadline.overdue {
+            color: var(--overdue-fg);
+            background: var(--overdue-bg);
+        }
+
+        .cell.deadline.urgent {
+            color: var(--late-fg);
+            background: var(--late-bg);
+        }
+
+        .cell.deadline.ok {
+            color: var(--ok-fg);
+        }
+
+        /* Status badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .badge-completed {
+            color: var(--ok-fg);
+            background: var(--ok-bg);
+        }
+
+        .badge-late {
+            color: var(--late-fg);
+            background: var(--late-bg);
+        }
+
+        .badge-overdue {
+            color: var(--overdue-fg);
+            background: var(--overdue-bg);
+        }
+
+        .badge-pending {
+            color: var(--pending-fg);
+            background: var(--pending-bg);
+        }
+
+        .badge-slate {
+            color: var(--slate-fg);
+            background: var(--slate-bg);
+        }
+
+        /* Expand button */
+        .expand-btn {
+            background: none;
+            border: 1px solid var(--line-strong);
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 9px;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--ink-faint);
+            transition: all 0.15s;
+        }
+
+        .expand-btn:hover {
+            background: var(--brand-soft);
+            color: var(--brand);
+            border-color: var(--brand);
+        }
+
+        .expand-btn.expanded {
+            background: var(--brand);
+            color: #fff;
+            border-color: var(--brand);
+        }
+
+        /* Detail row */
+        .detail-row {
+            display: none;
+            grid-template-columns: 1fr;
+            padding: 10px 14px 10px 16px;
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--line);
+            font-size: 11px;
+            position: relative;
+        }
+
+        .detail-row::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--line-strong);
+        }
+
+        .detail-row.open {
+            display: grid;
+        }
+
+        .detail-row .cell {
+            white-space: normal;
+            word-break: break-word;
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 6px 18px;
+        }
+
+        .detail-field {
+            display: flex;
+            gap: 6px;
+            align-items: baseline;
+        }
+
+        .detail-label {
+            font-weight: 700;
+            color: var(--ink-faint);
+            font-size: 9.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        .detail-value {
+            color: var(--ink);
+            font-size: 11px;
+        }
+
+        .detail-value.ref-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            color: var(--ref-fg);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: var(--ink-faint);
+            font-size: 11.5px;
+        }
+
+        @media (max-width: 860px) {
+            .table-row {
+                grid-template-columns: 60px 70px 1fr 70px 26px;
+            }
+
+            .table-row.header-row .cell:nth-child(3),
+            .table-row.header-row .cell:nth-child(4),
+            .table-row .cell.ref,
+            .table-row .cell.date {
+                display: none;
+            }
+
+            .filter-select {
+                flex: 1 1 45%;
+            }
+
+            .topbar {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div class="search-wrapper">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input type="text" class="search-box" placeholder="Tìm kiếm số hiệu, nội dung, đơn vị..."
+                    id="indexeddb-search" oninput="filterIndexedDB()">
+            </div>
+            <button class="btn" onclick="location.reload()">↻ Refresh</button>
+        </div>
+
+        <div class="status-panel" id="status-panel">
+            <div class="status-item loading">⏳ Đang kiểm tra các tầng lưu trữ...</div>
+        </div>
+
+        <div id="indexeddb">
+            <div class="card">
+                <div class="chip-row" id="chip-row"></div>
+
+                <div class="toolbar">
+                    <span class="toolbar-label">Ngày BH:</span>
+                    <input type="date" class="date-input" id="filter-date-from" onchange="filterIndexedDB()">
+                    <span class="date-sep">→</span>
+                    <input type="date" class="date-input" id="filter-date-to" onchange="filterIndexedDB()">
+
+                    <span class="toolbar-label">Hạn nộp:</span>
+                    <input type="date" class="date-input" id="filter-deadline-from" onchange="filterIndexedDB()">
+                    <span class="date-sep">→</span>
+                    <input type="date" class="date-input" id="filter-deadline-to" onchange="filterIndexedDB()">
+
+                    <select class="filter-select" id="filter-loaivb" onchange="filterIndexedDB()">
+                        <option value="">Loại VB: Tất cả</option>
+                    </select>
+                    <select class="filter-select" id="filter-donvi" onchange="filterIndexedDB()">
+                        <option value="">Đơn vị: Tất cả</option>
+                    </select>
+                    <select class="filter-select" id="filter-kieuthoihan" onchange="filterIndexedDB()">
+                        <option value="">Kiểu hạn: Tất cả</option>
+                    </select>
+                    <button class="filter-reset" onclick="resetFilters()">✕ Xoá lọc</button>
+                    <button class="collapse-all-btn" onclick="collapseAll()">▴ Thu gọn tất cả</button>
+                </div>
+                <datalist id="statuslist">
+                    <option value="Hoàn thành">
+                    <option value="Hoàn thành (trễ)">
+                    <option value="Chưa hoàn thành">
+                    <option value="Quá hạn">
+                    <option value="Không áp dụng">
+                </datalist>
+                <div id="indexeddb-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const IDB_NAME = 'theodoitiendo-db';
+        const IDB_STORE = 'app-state';
+        const IDB_KEY = 'main-state';
+        let currentIndexedDBData = null;
+        const activeChips = new Set();
+        const editingUids = new Set();
+
+        const fieldDefs = [
+            { key: 'so', label: 'Số hiệu' },
+            { key: 'loaiVanBan', label: 'Loại VB' },
+            { key: 'canCu', label: 'Căn cứ', wide: true },
+            { key: 'ngay', label: 'Ngày BH' },
+            { key: 'donViBanHanh', label: 'ĐV BH' },
+            { key: 'trichYeu', label: 'Trích yếu', textarea: true, wide: true },
+            { key: 'noiDung', label: 'Nội dung', textarea: true, wide: true },
+            { key: 'sanPham', label: 'Sản phẩm' },
+            { key: 'thoiHan', label: 'Thời hạn' },
+            { key: 'ngayHetHan', label: 'Hạn nộp', type: 'date' },
+            { key: 'diemGiao', label: 'Điểm giao' },
+            { key: 'donVi', label: 'ĐV thực hiện' },
+            { key: 'donViTheoDoi', label: 'ĐV theo dõi' },
+            { key: 'ghiChu', label: 'Ghi chú', textarea: true, wide: true },
+            { key: 'diemSoLuong', label: 'Điểm SL' },
+            { key: 'diemChatLuong', label: 'Điểm CL' },
+            { key: 'diemTienDo', label: 'Điểm TD' },
+            { key: 'minhChung', label: 'Minh chứng' },
+            { key: 'kieuThoiHan', label: 'Kiểu hạn' },
+            { key: 'gioHetHan', label: 'Giờ hết hạn' },
+            { key: 'trangThai', label: 'Trạng thái', status: true }
+        ];
+
+        const sectionConfig = [
+            { key: 'B', label: '📋 Chỉ đạo (B)', defaultOpen: true },
+            { key: 'C', label: '🎯 Chỉ tiêu (C)', defaultOpen: true },
+            { key: 'A', label: '📝 Nhiệm vụ (A)', defaultOpen: false },
+            { key: 'D', label: '📊 Khác (D)', defaultOpen: false }
+        ];
+
+        const chipConfig = [
+            { key: 'overdue', label: 'Quá hạn' },
+            { key: 'late', label: 'Trễ hạn' },
+            { key: 'urgent', label: 'Sắp đến hạn' },
+            { key: 'ok', label: 'Còn hạn' },
+            { key: 'completed', label: 'Đạt' },
+            { key: 'pending', label: 'Chưa' }
+        ];
+
+        function getStatusClass(status) {
+            if (!status) return 'pending';
+            const s = status.toLowerCase();
+            if (s.includes('hoàn thành') && !s.includes('trễ')) return 'completed';
+            if (s.includes('trễ') || s.includes('chưa đạt')) return 'late';
+            if (s.includes('quá hạn') || s.includes('chưa hoàn thành')) return 'overdue';
+            if (s === 'không áp dụng' || s === '-') return 'slate';
+            return 'pending';
+        }
+
+        function getStatusBadge(status) {
+            const cls = getStatusClass(status);
+            const labels = { completed: 'Đạt', late: 'Trễ', overdue: 'Quá hạn', pending: 'Chưa', slate: '—' };
+            return '<span class="badge badge-' + cls + '">' + (labels[cls] || status || '—') + '</span>';
+        }
+
+        function getDeadlineClass(targetDate, todayISO) {
+            if (!targetDate) return '';
+            const diff = (new Date(targetDate) - new Date(todayISO)) / 86400000;
+            if (diff < 0) return 'overdue';
+            if (diff <= 3) return 'urgent';
+            return 'ok';
+        }
+
+        // Parse dd/mm/yyyy or yyyy-mm-dd into a comparable ISO-ish string
+        function parseFlexDate(str) {
+            if (!str) return null;
+            str = String(str).trim();
+            let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) return str.slice(0, 10);
+            m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+            const d = new Date(str);
+            if (!isNaN(d)) return d.toISOString().split('T')[0];
+            return null;
+        }
+
+        function esc(str) {
+            if (!str) return '';
+            const d = document.createElement('div');
+            d.textContent = String(str);
+            return d.innerHTML;
+        }
+
+        function detailField(label, value, cls) {
+            return '<div class="detail-field"><span class="detail-label">' + esc(label) + '</span><span class="detail-value ' + (cls || '') + '">' + (esc(value) || '—') + '</span></div>';
+        }
+
+        function editField(item, uid, f) {
+            const value = item[f.key] || '';
+            let input;
+            if (f.textarea) {
+                input = '<textarea class="edit-input" data-field="' + f.key + '" rows="2">' + esc(value) + '</textarea>';
+            } else if (f.type === 'date') {
+                input = '<input type="date" class="edit-input" data-field="' + f.key + '" value="' + esc(value) + '">';
+            } else if (f.status) {
+                input = '<input type="text" class="edit-input" list="statuslist" data-field="' + f.key + '" value="' + esc(value) + '">';
+            } else {
+                input = '<input type="text" class="edit-input" data-field="' + f.key + '" value="' + esc(value) + '">';
+            }
+            return '<div class="edit-field' + (f.wide ? ' wide' : '') + '"><span class="detail-label">' + esc(f.label) + '</span>' + input + '</div>';
+        }
+
+        function renderRowPairInner(item, section, todayISO, editing) {
+            const uid = item.__uid;
+            const targetDate = item.ngayHetHan || '';
+            const statusText = item.trangThai || '';
+            const dlClass = getDeadlineClass(targetDate, todayISO);
+            const dlText = targetDate ? new Date(targetDate + 'T00:00:00').toLocaleDateString('vi-VN') : '';
+
+            let rowClass = '';
+            if (statusText && statusText.toLowerCase().includes('hoàn thành') && !statusText.toLowerCase().includes('trễ')) rowClass = 'completed';
+            else if (statusText && statusText.toLowerCase().includes('trễ')) rowClass = 'late';
+            else if (dlClass === 'overdue') rowClass = 'overdue';
+            else if (dlClass === 'urgent') rowClass = rowClass ? rowClass : 'urgent-row';
+
+            let html = '<div class="table-row ' + rowClass + '" data-uid="' + esc(uid) + '" data-section="' + esc(section) + '" onclick="toggleDetail(this)">';
+            html += '<div class="cell id">#' + (item.id !== undefined ? item.id : '—') + '</div>';
+            html += '<div class="cell status">' + getStatusBadge(statusText) + '</div>';
+            html += '<div class="cell ref">' + esc(item.so || '—') + '</div>';
+            html += '<div class="cell date">' + esc(item.ngay || '') + '</div>';
+            html += '<div class="cell content" title="' + esc(item.noiDung || item.trichYeu || '') + '">' + esc(item.trichYeu || item.noiDung || '—') + '</div>';
+            html += '<div class="cell">' + esc(item.loaiVanBan || '') + '</div>';
+            html += '<div class="cell deadline ' + dlClass + '">' + (targetDate ? dlText : '—') + '</div>';
+            html += '<div class="cell"><button class="expand-btn">▾</button></div>';
+            html += '</div>';
+
+            html += '<div class="detail-row" data-uid="' + esc(uid) + '" data-section="' + esc(section) + '">';
+            html += '<div class="cell">';
+
+            if (!editing) {
+                html += '<div class="action-bar">';
+                html += '<button type="button" class="row-btn edit" onclick="event.stopPropagation(); editItem(\'' + esc(uid) + '\', \'' + esc(section) + '\')">✎ Sửa</button>';
+                html += '<button type="button" class="row-btn delete" onclick="event.stopPropagation(); deleteItem(\'' + esc(uid) + '\', \'' + esc(section) + '\')">🗑 Xóa</button>';
+                html += '</div>';
+                html += detailField('Số hiệu', item.so, 'ref-value');
+                html += detailField('Loại VB', item.loaiVanBan);
+                html += detailField('Căn cứ', item.canCu);
+                html += detailField('Ngày BH', item.ngay);
+                html += detailField('ĐV BH', item.donViBanHanh);
+                html += detailField('Trích yếu', item.trichYeu);
+                html += detailField('Nội dung', item.noiDung);
+                html += detailField('Sản phẩm', item.sanPham);
+                html += detailField('Thời hạn', item.thoiHan);
+                html += detailField('Hạn nộp', item.ngayHetHan);
+                html += detailField('Điểm giao', item.diemGiao);
+                html += detailField('ĐV thực hiện', item.donVi);
+                html += detailField('ĐV theo dõi', item.donViTheoDoi);
+                html += detailField('Ghi chú', item.ghiChu);
+                html += detailField('Điểm SL', item.diemSoLuong);
+                html += detailField('Điểm CL', item.diemChatLuong);
+                html += detailField('Điểm TD', item.diemTienDo);
+                html += detailField('Minh chứng', item.minhChung);
+                html += detailField('Kiểu hạn', item.kieuThoiHan);
+                html += detailField('Giờ hết hạn', item.gioHetHan);
+            } else {
+                html += '<div class="action-bar">';
+                html += '<button type="button" class="row-btn save" onclick="event.stopPropagation(); saveItem(\'' + esc(uid) + '\', \'' + esc(section) + '\')">💾 Lưu</button>';
+                html += '<button type="button" class="row-btn cancel" onclick="event.stopPropagation(); cancelEdit(\'' + esc(uid) + '\', \'' + esc(section) + '\')">✕ Hủy</button>';
+                html += '</div>';
+                fieldDefs.forEach(f => { html += editField(item, uid, f); });
+            }
+
+            html += '</div>';
+            html += '</div>';
+
+            return html;
+        }
+
+        function renderTableHeader() {
+            let html = '<div class="table-row header-row">';
+            html += '<div class="cell">ID</div>';
+            html += '<div class="cell">TT</div>';
+            html += '<div class="cell">Số</div>';
+            html += '<div class="cell">Ngày BH</div>';
+            html += '<div class="cell">Trích yếu / Nội dung</div>';
+            html += '<div class="cell">Loại VB</div>';
+            html += '<div class="cell">Hạn nộp</div>';
+            html += '<div class="cell"></div>';
+            html += '</div>';
+            return html;
+        }
+
+        function toggleDetail(row) {
+            const detail = row.nextElementSibling;
+            if (detail && detail.classList.contains('detail-row')) {
+                const isOpen = detail.classList.contains('open');
+                detail.classList.toggle('open');
+                const btn = row.querySelector('.expand-btn');
+                if (btn) {
+                    btn.textContent = isOpen ? '▾' : '▴';
+                    btn.classList.toggle('expanded', !isOpen);
+                }
+            }
+        }
+
+        function getAllItems() {
+            if (!currentIndexedDBData) return [];
+            let all = [];
+            sectionConfig.forEach(s => { all = all.concat(currentIndexedDBData[s.key] || []); });
+            return all;
+        }
+
+        function itemMatchesChip(item, chipKey, todayISO) {
+            const statusCls = getStatusClass(item.trangThai);
+            const dlCls = getDeadlineClass(item.ngayHetHan || '', todayISO);
+            if (chipKey === 'overdue') return statusCls === 'overdue' || dlCls === 'overdue';
+            if (chipKey === 'late') return statusCls === 'late';
+            if (chipKey === 'urgent') return dlCls === 'urgent';
+            if (chipKey === 'ok') return dlCls === 'ok';
+            if (chipKey === 'completed') return statusCls === 'completed';
+            if (chipKey === 'pending') return statusCls === 'pending';
+            return false;
+        }
+
+        function renderChips() {
+            const today = new Date().toISOString().split('T')[0];
+            const all = getAllItems();
+            const row = document.getElementById('chip-row');
+            row.innerHTML = chipConfig.map(c => {
+                const count = all.filter(item => itemMatchesChip(item, c.key, today)).length;
+                const active = activeChips.has(c.key) ? 'active' : '';
+                return '<button type="button" class="chip ' + active + '" data-chip="' + c.key + '" onclick="toggleChip(\'' + c.key + '\')">' +
+                    '<span class="dot"></span>' + esc(c.label) + ' <span class="count">' + count + '</span></button>';
+            }).join('');
+        }
+
+        function toggleChip(key) {
+            if (activeChips.has(key)) activeChips.delete(key);
+            else activeChips.add(key);
+            filterIndexedDB();
+        }
+
+        function populateFilterOptions() {
+            if (!currentIndexedDBData) return;
+            const loaiSet = new Set();
+            const donViSet = new Set();
+            const kieuSet = new Set();
+            sectionConfig.forEach(s => {
+                (currentIndexedDBData[s.key] || []).forEach(item => {
+                    if (item.loaiVanBan) loaiSet.add(item.loaiVanBan);
+                    if (item.donVi) donViSet.add(item.donVi);
+                    if (item.kieuThoiHan) kieuSet.add(item.kieuThoiHan);
+                });
+            });
+
+            const loaiSelect = document.getElementById('filter-loaivb');
+            const prevLoai = loaiSelect.value;
+            loaiSelect.innerHTML = '<option value="">Loại VB: Tất cả</option>' +
+                Array.from(loaiSet).sort().map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+            loaiSelect.value = prevLoai;
+
+            const donViSelect = document.getElementById('filter-donvi');
+            const prevDonVi = donViSelect.value;
+            donViSelect.innerHTML = '<option value="">Đơn vị: Tất cả</option>' +
+                Array.from(donViSet).sort().map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+            donViSelect.value = prevDonVi;
+
+            const kieuSelect = document.getElementById('filter-kieuthoihan');
+            const prevKieu = kieuSelect.value;
+            kieuSelect.innerHTML = '<option value="">Kiểu hạn: Tất cả</option>' +
+                Array.from(kieuSet).sort().map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+            kieuSelect.value = prevKieu;
+        }
+
+        function resetFilters() {
+            document.getElementById('indexeddb-search').value = '';
+            document.getElementById('filter-date-from').value = '';
+            document.getElementById('filter-date-to').value = '';
+            document.getElementById('filter-deadline-from').value = '';
+            document.getElementById('filter-deadline-to').value = '';
+            document.getElementById('filter-loaivb').value = '';
+            document.getElementById('filter-donvi').value = '';
+            document.getElementById('filter-kieuthoihan').value = '';
+            activeChips.clear();
+            filterIndexedDB();
+        }
+
+        function filterIndexedDB() {
+            if (!currentIndexedDBData) return;
+            const q = document.getElementById('indexeddb-search').value.toLowerCase();
+            const dateFrom = document.getElementById('filter-date-from').value;
+            const dateTo = document.getElementById('filter-date-to').value;
+            const deadlineFrom = document.getElementById('filter-deadline-from').value;
+            const deadlineTo = document.getElementById('filter-deadline-to').value;
+            const loaiFilter = document.getElementById('filter-loaivb').value;
+            const donViFilter = document.getElementById('filter-donvi').value;
+            const kieuFilter = document.getElementById('filter-kieuthoihan').value;
+            const today = new Date().toISOString().split('T')[0];
+            let html = '';
+
+            renderChips();
+
+            sectionConfig.forEach(s => {
+                const items = (currentIndexedDBData[s.key] || []).filter(item => {
+                    if (q) {
+                        const hay = [item.so, item.noiDung, item.trichYeu, item.donVi, item.donViBanHanh, item.sanPham, item.loaiVanBan, item.ngay, item.ngayHetHan].join(' ').toLowerCase();
+                        if (!hay.includes(q)) return false;
+                    }
+                    if (activeChips.size > 0) {
+                        const matchesAny = Array.from(activeChips).some(ck => itemMatchesChip(item, ck, today));
+                        if (!matchesAny) return false;
+                    }
+                    if (dateFrom || dateTo) {
+                        const issueDate = parseFlexDate(item.ngay);
+                        if (!issueDate) return false;
+                        if (dateFrom && issueDate < dateFrom) return false;
+                        if (dateTo && issueDate > dateTo) return false;
+                    }
+                    if (deadlineFrom || deadlineTo) {
+                        const dueDate = parseFlexDate(item.ngayHetHan);
+                        if (!dueDate) return false;
+                        if (deadlineFrom && dueDate < deadlineFrom) return false;
+                        if (deadlineTo && dueDate > deadlineTo) return false;
+                    }
+                    if (loaiFilter && item.loaiVanBan !== loaiFilter) return false;
+                    if (donViFilter && item.donVi !== donViFilter) return false;
+                    if (kieuFilter && item.kieuThoiHan !== kieuFilter) return false;
+                    return true;
+                });
+                html += '<div class="section-body ' + (s.defaultOpen ? 'open' : '') + '" data-section="' + s.key + '">';
+                if (items.length > 0) {
+                    html += '<div class="info-bar" style="margin-bottom:4px;">' + s.label + ' — ' + items.length + ' mục</div>';
+                    html += renderTableHeader();
+                    items.forEach((item) => {
+                        html += '<div class="row-pair" data-uid="' + esc(item.__uid) + '">' + renderRowPairInner(item, s.key, today, editingUids.has(item.__uid)) + '</div>';
+                    });
+                } else {
+                    html += '<div class="empty-state">Không tìm thấy trong ' + s.label + '</div>';
+                }
+                html += '</div>';
+            });
+
+            document.getElementById('indexeddb-result').innerHTML = html || '<div class="empty-state">Không có dữ liệu.</div>';
+        }
+
+        function assignUids(data) {
+            sectionConfig.forEach(s => {
+                (data[s.key] || []).forEach((item, i) => {
+                    if (!item.__uid) item.__uid = s.key + '_' + i + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                });
+            });
+        }
+
+        function findItem(uid, section) {
+            return (currentIndexedDBData[section] || []).find(it => it.__uid === uid);
+        }
+
+        async function persistData() {
+            try {
+                const db = await new Promise((resolve, reject) => {
+                    const req = indexedDB.open(IDB_NAME);
+                    req.onerror = () => reject(req.error);
+                    req.onsuccess = () => resolve(req.result);
+                });
+                if (!db.objectStoreNames.contains(IDB_STORE)) {
+                    alert('Không tìm thấy kho dữ liệu để lưu.');
+                    return false;
+                }
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    tx.objectStore(IDB_STORE).put(currentIndexedDBData, IDB_KEY);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+                return true;
+            } catch (e) {
+                alert('Lỗi khi lưu: ' + e.message);
+                return false;
+            }
+        }
+
+        function updateRowPairDom(uid, section, keepOpen) {
+            const item = findItem(uid, section);
+            const pair = document.querySelector('.row-pair[data-uid="' + CSS.escape(uid) + '"]');
+            if (!pair || !item) return;
+            const today = new Date().toISOString().split('T')[0];
+            pair.innerHTML = renderRowPairInner(item, section, today, editingUids.has(uid));
+            if (keepOpen) {
+                const detail = pair.querySelector('.detail-row');
+                const row = pair.querySelector('.table-row');
+                if (detail) detail.classList.add('open');
+                const btn = row ? row.querySelector('.expand-btn') : null;
+                if (btn) { btn.textContent = '▴'; btn.classList.add('expanded'); }
+            }
+        }
+
+        function editItem(uid, section) {
+            editingUids.add(uid);
+            updateRowPairDom(uid, section, true);
+        }
+
+        function cancelEdit(uid, section) {
+            editingUids.delete(uid);
+            updateRowPairDom(uid, section, true);
+        }
+
+        function saveItem(uid, section) {
+            const item = findItem(uid, section);
+            if (!item) return;
+            const detail = document.querySelector('.detail-row[data-uid="' + CSS.escape(uid) + '"]');
+            if (!detail) return;
+            detail.querySelectorAll('.edit-input').forEach(input => {
+                const field = input.dataset.field;
+                item[field] = input.value;
+            });
+            editingUids.delete(uid);
+            persistData().then(() => {
+                populateFilterOptions();
+                renderChips();
+            });
+            updateRowPairDom(uid, section, true);
+        }
+
+        function deleteItem(uid, section) {
+            const item = findItem(uid, section);
+            if (!item) return;
+            const label = item.so || item.trichYeu || item.noiDung || ('mục ' + uid);
+            if (!confirm('Xóa văn bản "' + label + '"? Hành động này không thể hoàn tác.')) return;
+            const idx = (currentIndexedDBData[section] || []).findIndex(it => it.__uid === uid);
+            if (idx > -1) {
+                currentIndexedDBData[section].splice(idx, 1);
+                editingUids.delete(uid);
+                persistData().then(() => {
+                    populateFilterOptions();
+                    filterIndexedDB();
+                });
+            }
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('.detail-row.open').forEach(d => {
+                d.classList.remove('open');
+                const row = d.previousElementSibling;
+                if (row && row.classList.contains('table-row')) {
+                    const btn = row.querySelector('.expand-btn');
+                    if (btn) { btn.textContent = '▾'; btn.classList.remove('expanded'); }
+                }
+            });
+        }
+
+        // ---------- Storage status panel ----------
+        const BACKEND_TOKEN_KEY = 'theodoitiendo_token';
+        const BACKUP_TS_KEY = 'ca-xa-last-backup-export-ts';
+        const BACKUP_REMINDER_THRESHOLD_DAYS = 7;
+        const HEALTH_CHECK_TIMEOUT_MS = 1500;
+
+        async function checkBackendHealth() {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+            try {
+                const res = await fetch('/api/health', { signal: controller.signal });
+                return res.ok;
+            } catch {
+                return false;
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+
+        async function fetchBackendState() {
+            let token = null;
+            try { token = localStorage.getItem(BACKEND_TOKEN_KEY); } catch { }
+            if (!token) return { ok: false, reason: 'no-token' };
+            try {
+                const res = await fetch('/api/state', { headers: { Authorization: 'Bearer ' + token } });
+                if (res.status === 401) return { ok: false, reason: 'unauthorized' };
+                if (!res.ok) return { ok: false, reason: 'error' };
+                const data = await res.json();
+                return { ok: true, updatedAt: data.updatedAt };
+            } catch {
+                return { ok: false, reason: 'network' };
+            }
+        }
+
+        function getExcelBackupInfo() {
+            try {
+                const raw = localStorage.getItem(BACKUP_TS_KEY);
+                if (!raw) return { days: null };
+                const ts = parseInt(raw, 10);
+                if (!ts || isNaN(ts)) return { days: null };
+                return { days: Math.floor((Date.now() - ts) / 86400000) };
+            } catch {
+                return { days: null };
+            }
+        }
+
+        function statusItemHtml(icon, label, detail, cls) {
+            return '<div class="status-item ' + cls + '"><span class="status-icon">' + icon + '</span>' +
+                '<span class="status-label">' + esc(label) + '</span>' +
+                '<span class="status-detail">' + esc(detail) + '</span></div>';
+        }
+
+        async function renderStatusPanel() {
+            const panel = document.getElementById('status-panel');
+            const items = [];
+
+            // 1. IndexedDB — luôn là tầng đang hiển thị trên trang này
+            const idbCount = currentIndexedDBData ? getAllItems().length : 0;
+            items.push(statusItemHtml('🟢', 'IndexedDB (trình duyệt)',
+                idbCount + ' mục — đây là dữ liệu bạn đang xem trên trang này', 'ok'));
+
+            // 2. Backend SQLite
+            const healthy = await checkBackendHealth();
+            if (!healthy) {
+                items.push(statusItemHtml('🔴', 'Backend SQLite',
+                    'Không kết nối được — cần chạy "npm run backend" trên máy chủ', 'off'));
+            } else {
+                const state = await fetchBackendState();
+                if (state.ok) {
+                    let updatedText = 'không rõ thời điểm';
+                    if (state.updatedAt) {
+                        const d = new Date(state.updatedAt.replace(' ', 'T') + 'Z');
+                        if (!isNaN(d)) updatedText = d.toLocaleString('vi-VN');
+                    }
+                    items.push(statusItemHtml('🟢', 'Backend SQLite',
+                        'Đang chạy — dữ liệu trên server cập nhật lần cuối: ' + updatedText, 'ok'));
+                } else if (state.reason === 'no-token' || state.reason === 'unauthorized') {
+                    items.push(statusItemHtml('🟡', 'Backend SQLite',
+                        'Server đang chạy nhưng chưa đăng nhập trong ứng dụng chính nên không đọc được trạng thái đồng bộ', 'warn'));
+                } else {
+                    items.push(statusItemHtml('🟡', 'Backend SQLite',
+                        'Server đang chạy nhưng không đọc được dữ liệu trạng thái', 'warn'));
+                }
+            }
+
+            // 3. Excel Backup
+            const excel = getExcelBackupInfo();
+            if (excel.days === null) {
+                items.push(statusItemHtml('⚪', 'Excel Backup',
+                    'Chưa từng export trên trình duyệt này (hoặc dữ liệu nhắc nhở đã bị xóa)', 'unknown'));
+            } else if (excel.days >= BACKUP_REMINDER_THRESHOLD_DAYS) {
+                items.push(statusItemHtml('🔴', 'Excel Backup',
+                    excel.days + ' ngày trước — đã quá hạn nhắc export (>' + BACKUP_REMINDER_THRESHOLD_DAYS + ' ngày)', 'off'));
+            } else if (excel.days >= BACKUP_REMINDER_THRESHOLD_DAYS - 2) {
+                items.push(statusItemHtml('🟡', 'Excel Backup',
+                    excel.days + ' ngày trước — sắp đến hạn nhắc export', 'warn'));
+            } else {
+                items.push(statusItemHtml('🟢', 'Excel Backup', excel.days + ' ngày trước', 'ok'));
+            }
+
+            // 4. Tầng backup toàn project (backup-server.cjs / tar.gz) — chưa xác minh được cơ chế
+            items.push(statusItemHtml('⚪', 'Backup toàn project (tar.gz)',
+                'Chưa xác minh được cơ chế — cần đọc backup-server.cjs / restore.js để hiển thị chính xác', 'unknown'));
+
+            panel.innerHTML = items.join('');
+        }
+
+        function toggleSection(btn) {
+            const section = btn.dataset.section;
+            const body = document.querySelector('.section-body[data-section="' + section + '"]');
+            if (body) {
+                body.classList.toggle('open');
+                btn.classList.toggle('active');
+            }
+        }
+
+        async function loadIndexedDB() {
+            const result = document.getElementById('indexeddb-result');
+            result.innerHTML = '<div class="info-bar">⏳ Đang tải...</div>';
+            try {
+                const db = await new Promise((resolve, reject) => {
+                    const req = indexedDB.open(IDB_NAME);
+                    req.onerror = () => reject(req.error);
+                    req.onsuccess = () => resolve(req.result);
+                });
+                if (!db.objectStoreNames.contains(IDB_STORE)) {
+                    result.innerHTML = '<div class="info-bar">ℹ️ Chưa có dữ liệu trong IndexedDB.</div>';
+                    return;
+                }
+                const data = await new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE, 'readonly');
+                    const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+                if (!data) {
+                    result.innerHTML = '<div class="info-bar">ℹ️ IndexedDB trống.</div>';
+                    return;
+                }
+                assignUids(data);
+                currentIndexedDBData = data;
+                populateFilterOptions();
+                renderChips();
+                const today = new Date().toISOString().split('T')[0];
+
+                let html = '<div class="section-toggle">';
+                sectionConfig.forEach(s => {
+                    html += '<button class="' + (s.defaultOpen ? 'active' : '') + '" data-section="' + s.key + '" onclick="toggleSection(this)">' + s.label + '</button>';
+                });
+                html += '</div>';
+
+                sectionConfig.forEach(s => {
+                    const items = data[s.key] || [];
+                    html += '<div class="section-body ' + (s.defaultOpen ? 'open' : '') + '" data-section="' + s.key + '">';
+                    if (items.length > 0) {
+                        html += renderTableHeader();
+                        items.forEach((item) => {
+                            html += '<div class="row-pair" data-uid="' + esc(item.__uid) + '">' + renderRowPairInner(item, s.key, today, false) + '</div>';
+                        });
+                    } else {
+                        html += '<div class="empty-state">Không có dữ liệu</div>';
+                    }
+                    html += '</div>';
+                });
+
+                result.innerHTML = html;
+            } catch (e) {
+                result.innerHTML = '<div class="info-bar" style="background:#fee2e2;color:#991b1b;">❌ Lỗi: ' + esc(e.message) + '</div>';
+            }
+        }
+
+        window.onload = function () {
+            loadIndexedDB();
+            renderStatusPanel();
+        };
+    </script>
+</body>
+
+</html>

@@ -20,7 +20,7 @@ import { getAppState, saveAppState, findUserByUsername } from './server/db.js';
 import { verifyPassword, signToken, authMiddleware } from './server/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3002;
 
 export function createServer() {
   const app = express();
@@ -74,11 +74,13 @@ export function createServer() {
   app.get('/api/health', (req, res) => res.json({ ok: true }));
 
   // --- Serve the built frontend (must run `npm run build` first) ---
+  /*
   const distPath = path.join(__dirname, 'dist');
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
+  */
 
   return app;
 }

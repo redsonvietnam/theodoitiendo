@@ -610,15 +610,16 @@ export default function ExcelTableView({
           </thead>
           <tbody className="divide-y divide-slate-200">
             {tasks.map((row, index) => {
-              const isOverdue = row.ngayHetHan && row.ngayHetHan < todayISO && row.trangThai !== 'Hoàn thành đúng hạn' && row.trangThai !== 'Hoàn thành trễ hạn';
+              const rowStatusInfo = getTaskStatusInfo(row);
+              const isOverdue = row.ngayHetHan && row.ngayHetHan < todayISO && !rowStatusInfo.isCompleted;
               const dLeft = daysUntil(row.ngayHetHan);
-              const isDueSoon = row.ngayHetHan && !isOverdue && dLeft !== null && dLeft <= 5 && row.trangThai !== 'Hoàn thành đúng hạn' && row.trangThai !== 'Hoàn thành trễ hạn';
+              const isDueSoon = row.ngayHetHan && !isOverdue && dLeft !== null && dLeft <= 5 && !rowStatusInfo.isCompleted;
 
               // Determine row background
               let rowBg = 'hover:bg-slate-50/70 transition-colors';
-              if (row.trangThai === 'Hoàn thành đúng hạn') {
+              if (rowStatusInfo.isCompleted && !rowStatusInfo.isLate) {
                 rowBg = 'bg-emerald-50/25 hover:bg-emerald-50/40 transition-colors';
-              } else if (row.trangThai === 'Hoàn thành trễ hạn') {
+              } else if (rowStatusInfo.isCompleted && rowStatusInfo.isLate) {
                 rowBg = 'bg-amber-50/20 hover:bg-amber-50/35 transition-colors';
               } else if (isOverdue) {
                 rowBg = 'bg-red-50/40 hover:bg-red-50/60 transition-colors';
@@ -628,7 +629,7 @@ export default function ExcelTableView({
 
               // Default point values
               const showDiemSoLuong = row.diemSoLuong !== undefined ? row.diemSoLuong : (
-                row.trangThai === 'Hoàn thành đúng hạn' ? row.diemGiao : (row.trangThai === 'Hoàn thành trễ hạn' ? row.diemGiao * 0.5 : '')
+                rowStatusInfo.isCompleted ? (rowStatusInfo.isLate ? row.diemGiao * 0.5 : row.diemGiao) : ''
               );
               const showDiemChatLuong = row.diemChatLuong !== undefined ? row.diemChatLuong : '';
               const showDiemTienDo = row.diemTienDo !== undefined ? row.diemTienDo : '';

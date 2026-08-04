@@ -4,36 +4,38 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Calendar as CalendarIcon, 
-  Plus, 
-  X, 
-  Eye, 
-  Clock, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Calendar as CalendarIcon,
+  Plus,
+  X,
+  Eye,
+  Clock,
   CheckCircle,
   HelpCircle,
   AlertCircle,
-  Save
+  Save,
+  Search
 } from 'lucide-react';
 import { AppState, TaskBC, TaskMilestone } from '../types';
-import { 
-  formatDonViBanHanhDisplay, 
-  POLICE_DEPARTMENTS, 
-  suggestDocumentSymbol, 
-  parseDocumentNumber, 
-  parseDocumentSymbolTwoWay, 
-  tryExpandShorthand, 
-  formatToDDMMYY, 
+import {
+  formatDonViBanHanhDisplay,
+  POLICE_DEPARTMENTS,
+  suggestDocumentSymbol,
+  parseDocumentNumber,
+  parseDocumentSymbolTwoWay,
+  tryExpandShorthand,
+  formatToDDMMYY,
   formatToDDMM,
   parseQuickDate,
   isDateMatchingDeadline,
-  standardizeToYYYYMMDD 
+  standardizeToYYYYMMDD
 } from '../utils/documentHelper';
 import MilestoneManager from './MilestoneManager';
 import DeptCombobox from './DeptCombobox';
-import { compileCanCu, isRecurringText, computeAutoStatus } from '../utils/cancu';
+import { compileCanCu, isRecurringText, computeAutoStatus, getTaskStatusInfo, cleanInlineText, formatParagraphText } from '../utils/cancu';
 
 const getDayMonthOfDate = (dateStr: string) => {
   if (!dateStr) return '';
@@ -94,7 +96,7 @@ const daysUntil = (dateStr: string): number | null => {
   if (!dateStr) return null;
   const deadline = new Date(dateStr + 'T00:00:00');
   const today = new Date(getTodayDateString() + 'T00:00:00');
-  
+
   // Calculate difference in days
   const diffTime = deadline.getTime() - today.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
@@ -124,9 +126,10 @@ interface CalendarViewProps {
 }
 
 export default function CalendarView({ state, updateTaskBC }: CalendarViewProps) {
-  // Let's set initial calendar view to July 2026, since seed data is mostly in 2026-06 and 2026-07.
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(6); // 0-indexed (6 is July)
+  const today = new Date();
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedTask, setSelectedTask] = useState<{
     section: 'B' | 'C';
@@ -203,7 +206,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
       const index = match.index;
       const numPart = num.substring(0, index).trim();
       const rawSymPart = num.substring(index).replace(/^\//, '');
-      
+
       const expanded = tryExpandShorthand(rawSymPart);
       if (expanded) {
         setSoNumberOnly(numPart);
@@ -260,7 +263,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     }
 
     const expanded = tryExpandShorthand(cleanSym);
-    
+
     if (expanded) {
       setSoSymbolOnly(expanded.expandedSymbol);
       setSo(soNumberOnly ? `${soNumberOnly}${expanded.expandedSymbol}` : expanded.expandedSymbol);
@@ -269,7 +272,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
       const symWithSlash = sym.startsWith('/') ? sym : `/${sym}`;
       setSoSymbolOnly(symWithSlash);
       setSo(soNumberOnly ? `${soNumberOnly}${symWithSlash}` : symWithSlash);
-      
+
       const parsed = parseDocumentSymbolTwoWay(symWithSlash);
       applyTwoWayParsedResult(parsed.detectedLoaiVanBan, parsed.detectedIsFromCAT, parsed.detectedDeptCode);
     }
@@ -351,14 +354,15 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     setSanPham(t.sanPham || '');
     setNgayHetHan(t.ngayHetHan || '');
     setQuickDateHetHan(formatToDDMMYY(t.ngayHetHan || ''));
-    
-    if (t.trangThai === 'Hoàn thành đúng hạn' || t.trangThai === 'Hoàn thành trễ hạn' || t.trangThai === 'Đã hoàn thành') {
+
+    const openEditIsCompleted = getTaskStatusInfo(t).isCompleted || t.trangThai === 'Đã hoàn thành';
+    if (openEditIsCompleted) {
       setTrangThai('Đã hoàn thành');
     } else {
       setTrangThai(t.trangThai || '');
     }
 
-    const initialNgayHoanThanh = t.ngayHoanThanh || ((t.trangThai === 'Hoàn thành đúng hạn' || t.trangThai === 'Hoàn thành trễ hạn' || t.trangThai === 'Đã hoàn thành') ? getTodayDateString() : '');
+    const initialNgayHoanThanh = t.ngayHoanThanh || (openEditIsCompleted ? getTodayDateString() : '');
     setNgayHoanThanh(initialNgayHoanThanh);
     setQuickDateHoanThanh(formatToDDMMYY(initialNgayHoanThanh));
 
@@ -393,8 +397,8 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     }
 
     const computedSymbol = soSymbolOnly ? (soSymbolOnly.startsWith('/') ? soSymbolOnly : `/${soSymbolOnly}`) : '';
-    const fallbackSo = soNumberOnly 
-      ? `${soNumberOnly}${computedSymbol}` 
+    const fallbackSo = soNumberOnly
+      ? `${soNumberOnly}${computedSymbol}`
       : computedSymbol;
     const finalSo = so.trim() || fallbackSo;
 
@@ -422,8 +426,8 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
       so: finalSo,
       ngay: finalNgay,
       donViBanHanh,
-      trichYeu,
-      noiDung,
+      trichYeu: cleanInlineText(trichYeu),
+      noiDung: cleanInlineText(noiDung),
       thoiHan: finalThoiHan,
       diemGiao,
       donVi,
@@ -442,7 +446,8 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     setSelectedTask(null);
   };
 
-  const [currentDay, setCurrentDay] = useState(21);
+  const [currentDay, setCurrentDay] = useState(today.getDate());
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [filterSection, setFilterSection] = useState<'B' | 'C' | 'all'>('all');
   const [filterUnit, setFilterUnit] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -482,16 +487,16 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     const current = new Date(currentYear, currentMonth, currentDay);
     const dayOfWeek = current.getDay(); // 0 = Sunday, 1 = Monday, etc.
     const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    
+
     const weekDays: Array<{ date: Date; dayNum: number; monthNum: number; yearNum: number; dateString: string; label: string }> = [];
-    
+
     for (let i = 0; i < 7; i++) {
       const d = new Date(currentYear, currentMonth, currentDay + distanceToMonday + i);
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
       const dateString = `${yyyy}-${mm}-${dd}`;
-      
+
       const labels = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
       weekDays.push({
         date: d,
@@ -607,7 +612,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     const matchesStatus = (t: TaskBC) => {
       if (filterStatus === 'all') return true;
       if (filterStatus === 'completed') {
-        return t.trangThai === 'Hoàn thành đúng hạn' || t.trangThai === 'Hoàn thành trễ hạn';
+        return getTaskStatusInfo(t).isCompleted;
       }
       if (filterStatus === 'incomplete') {
         return t.trangThai === 'Chưa hoàn thành';
@@ -638,6 +643,19 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
       const matchesSec = filterSection === 'all' || t.section === filterSection;
       const matchesUnit = !filterUnit || t.donVi === filterUnit;
       return matchesSec && matchesUnit && matchesStatus(t);
+    }).map(t => {
+      let isMatch = true;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchCanCu = t.canCu.toLowerCase().includes(q);
+        const matchSo = (t.so || '').toLowerCase().includes(q);
+        const matchTrichYeu = (t.trichYeu || '').toLowerCase().includes(q);
+        const matchNoiDung = t.noiDung.toLowerCase().includes(q);
+        const matchDonVi = t.donVi.toLowerCase().includes(q);
+        const matchSanPham = t.sanPham.toLowerCase().includes(q);
+        isMatch = matchCanCu || matchSo || matchTrichYeu || matchNoiDung || matchDonVi || matchSanPham;
+      }
+      return { ...t, isMatch };
     });
   };
 
@@ -648,13 +666,13 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
   // Compile unscheduled tasks (B and C with empty ngayHetHan)
   const getUnscheduledTasks = () => {
     const todayStr = getTodayDateString();
-    
+
     const matchesStatus = (t: TaskBC) => {
       if (filterStatus === 'all') return true;
       // Unscheduled tasks don't have deadlines, so they can't be overdue
       if (filterStatus === 'overdue') return false;
       if (filterStatus === 'completed') {
-        return t.trangThai === 'Hoàn thành đúng hạn' || t.trangThai === 'Hoàn thành trễ hạn';
+        return getTaskStatusInfo(t).isCompleted;
       }
       if (filterStatus === 'incomplete' || filterStatus === 'not_overdue_incomplete') {
         return t.trangThai === 'Chưa hoàn thành';
@@ -677,6 +695,19 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
       const matchesSec = filterSection === 'all' || t.section === filterSection;
       const matchesUnit = !filterUnit || t.donVi === filterUnit;
       return matchesSec && matchesUnit && matchesStatus(t);
+    }).map(t => {
+      let isMatch = true;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchCanCu = t.canCu.toLowerCase().includes(q);
+        const matchSo = (t.so || '').toLowerCase().includes(q);
+        const matchTrichYeu = (t.trichYeu || '').toLowerCase().includes(q);
+        const matchNoiDung = t.noiDung.toLowerCase().includes(q);
+        const matchDonVi = t.donVi.toLowerCase().includes(q);
+        const matchSanPham = t.sanPham.toLowerCase().includes(q);
+        isMatch = matchCanCu || matchSo || matchTrichYeu || matchNoiDung || matchDonVi || matchSanPham;
+      }
+      return { ...t, isMatch };
     });
   };
 
@@ -697,22 +728,26 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     return monthTasks.sort((a, b) => a.day - b.day);
   };
 
-  // Status colors inside Calendar Cell (Pastel Theme)
-  const getStatusBg = (status: string) => {
-    switch (status) {
-      case 'Hoàn thành đúng hạn': return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60';
-      case 'Hoàn thành trễ hạn': return 'bg-amber-50 text-amber-700 border border-amber-200/60';
-      case 'Chưa hoàn thành': return 'bg-rose-50 text-rose-700 border border-rose-200/60';
-      case 'Không áp dụng': return 'bg-slate-50 text-slate-500 border border-slate-200/60';
-      default: return 'bg-slate-50 text-slate-600 border border-slate-200/60';
-    }
+  // Status colors inside Calendar Cell (Pastel Theme).
+  // Takes the task (not just the raw trangThai string) because a
+  // late-completed task stores trangThai as e.g. "Hoàn thành trễ hạn 5 ngày"
+  // (day-count suffix) — an exact string switch would miss it and fall
+  // through to the default gray style.
+  const getStatusBg = (task: TaskBC) => {
+    const info = getTaskStatusInfo(task);
+    if (info.isCompleted && !info.isLate) return 'bg-emerald-50 text-emerald-700 border border-emerald-200/60';
+    if (info.isCompleted && info.isLate) return 'bg-amber-50 text-amber-700 border border-amber-200/60';
+    if (task.trangThai === 'Chưa hoàn thành') return 'bg-rose-50 text-rose-700 border border-rose-200/60';
+    if (task.trangThai === 'Không áp dụng') return 'bg-slate-50 text-slate-500 border border-slate-200/60';
+    return 'bg-slate-50 text-slate-600 border border-slate-200/60';
   };
 
   // Render Calendar Day Cells
   const renderCells = () => {
     const cells = [];
     const todayStr = getTodayDateString();
-    
+    const hasSearch = searchQuery.trim().length > 0;
+
     // Empty cells for padding before the 1st of month
     for (let i = 0; i < firstDayIndex; i++) {
       cells.push(
@@ -723,9 +758,9 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const dayTasks = getTasksOnDay(day);
-      const isToday = 
-        new Date().getDate() === day && 
-        new Date().getMonth() === currentMonth && 
+      const isToday =
+        new Date().getDate() === day &&
+        new Date().getMonth() === currentMonth &&
         new Date().getFullYear() === currentYear;
 
       const dayStr = String(day).padStart(2, '0');
@@ -737,8 +772,8 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
       const isSunday = dayOfWeek === 0;
 
       cells.push(
-        <div 
-          key={`day-${day}`} 
+        <div
+          key={`day-${day}`}
           title="Nhấn vào ngày này để xem chi tiết theo Ngày"
           onClick={() => {
             if (quickAssignTask) {
@@ -777,7 +812,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
               const finalThoiHan = t.kieuThoiHan === 'custom' || t.kieuThoiHan === 'custom_c'
                 ? t.thoiHan
                 : compileThoiHanString(t.kieuThoiHan || 'truoc_ngay', dateString, t.gioHetHan || '00:00', t.thoiHan || '');
-              
+
               updateTaskBC(section, originalIndex, {
                 ngayHetHan: dateString,
                 thoiHan: finalThoiHan,
@@ -787,31 +822,28 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
               console.error("Drop failed:", err);
             }
           }}
-          className={`min-h-[125px] border p-2 flex flex-col justify-between transition group/cell relative ${
-            quickAssignTask 
-              ? 'hover:bg-amber-50/80 cursor-pointer border-dashed border-amber-400 bg-amber-50/10' 
-              : isToday
-                ? 'bg-rose-50/5 border-slate-200 hover:bg-slate-50/60'
-                : isSunday
-                  ? 'bg-rose-50/25 border-rose-100/70 hover:bg-rose-50/45'
-                  : isSaturday
-                    ? 'bg-sky-50/15 border-sky-100/50 hover:bg-sky-50/35'
-                    : 'bg-white border-slate-200 hover:bg-slate-50/60'
-          } ${
-            isToday ? 'ring-2 ring-[#a3212e] ring-inset' : ''
-          }`}
+          className={`min-h-[125px] border p-2 flex flex-col justify-between transition group/cell relative ${quickAssignTask
+            ? 'hover:bg-amber-50/80 cursor-pointer border-dashed border-amber-400 bg-amber-50/10'
+            : isToday
+              ? 'bg-rose-50/5 border-slate-200 hover:bg-slate-50/60'
+              : isSunday
+                ? 'bg-rose-50/25 border-rose-100/70 hover:bg-rose-50/45'
+                : isSaturday
+                  ? 'bg-sky-50/15 border-sky-100/50 hover:bg-sky-50/35'
+                  : 'bg-white border-slate-200 hover:bg-slate-50/60'
+            } ${isToday ? 'ring-2 ring-[#a3212e] ring-inset' : ''
+            }`}
         >
           {/* Day number header */}
           <div className="flex items-center justify-between pointer-events-none">
-            <span className={`text-xs font-mono font-bold ${
-              isToday 
-                ? 'bg-[#a3212e] text-white w-5 h-5 rounded-full flex items-center justify-center font-bold' 
-                : isSunday
-                  ? 'text-rose-600 font-extrabold'
-                  : isSaturday
-                    ? 'text-sky-600 font-extrabold'
-                    : 'text-slate-700'
-            }`}>
+            <span className={`text-xs font-mono font-bold ${isToday
+              ? 'bg-[#a3212e] text-white w-5 h-5 rounded-full flex items-center justify-center font-bold'
+              : isSunday
+                ? 'text-rose-600 font-extrabold'
+                : isSaturday
+                  ? 'text-sky-600 font-extrabold'
+                  : 'text-slate-700'
+              }`}>
               {day}
             </span>
             {dayTasks.length > 0 && (
@@ -834,26 +866,31 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
           {!quickAssignTask && (
             <div className="space-y-1 mt-1.5 flex-1 overflow-y-auto max-h-[85px] pr-0.5 custom-scrollbar">
               {dayTasks.map(t => {
-                const isOverdue = t.ngayHetHan && t.ngayHetHan < todayStr && t.trangThai !== 'Hoàn thành đúng hạn' && t.trangThai !== 'Hoàn thành trễ hạn';
+                const statusInfo = getTaskStatusInfo(t);
+                const isOverdue = t.ngayHetHan && t.ngayHetHan < todayStr && !statusInfo.isCompleted;
                 const dLeft = t.ngayHetHan ? daysUntil(t.ngayHetHan) : null;
-                const isDueSoon = t.ngayHetHan && !isOverdue && dLeft !== null && dLeft <= 5 && t.trangThai !== 'Hoàn thành đúng hạn' && t.trangThai !== 'Hoàn thành trễ hạn';
+                const isDueSoon = t.ngayHetHan && !isOverdue && dLeft !== null && dLeft <= 5 && !statusInfo.isCompleted;
+
+                const searchOpacity = hasSearch ? (t.isMatch ? 'opacity-100' : 'opacity-30 hover:opacity-90') : 'opacity-100';
 
                 // Section-specific indicators
                 const sectionLabel = t.section === 'B' ? 'Hạn' : 'ĐK';
-                const sectionBadgeClass = t.section === 'B' 
-                  ? 'bg-indigo-600 text-white' 
+                const sectionBadgeClass = t.section === 'B'
+                  ? 'bg-indigo-600 text-white'
                   : 'bg-purple-600 text-white';
 
                 // Left border visual differentiator for Section B vs C
-                const borderLeftClass = t.section === 'B' 
-                  ? 'border-l-[3px] border-l-indigo-500' 
+                const borderLeftClass = t.section === 'B'
+                  ? 'border-l-[3px] border-l-indigo-500'
                   : 'border-l-[3px] border-l-purple-500';
 
-                // Status theme
+                // Status theme (uses getTaskStatusInfo so a late-completed task,
+                // e.g. trangThai === "Hoàn thành trễ hạn 5 ngày", is still
+                // recognized instead of falling through to the default gray style)
                 let statusBg = 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200';
-                if (t.trangThai === 'Hoàn thành đúng hạn') {
+                if (statusInfo.isCompleted && !statusInfo.isLate) {
                   statusBg = 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200';
-                } else if (t.trangThai === 'Hoàn thành trễ hạn') {
+                } else if (statusInfo.isCompleted && statusInfo.isLate) {
                   statusBg = 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200';
                 } else if (t.trangThai === 'Chưa hoàn thành') {
                   statusBg = 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200';
@@ -869,7 +906,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                       e.stopPropagation();
                       handleOpenEdit(t.section, t.originalIndex, t);
                     }}
-                    className={`w-full text-left text-[9.5px] px-1.5 py-1 rounded transition duration-150 active:scale-[0.99] flex flex-col gap-0.5 cursor-pointer outline-none shadow-3xs ${borderLeftClass} ${statusBg}`}
+                    className={`w-full text-left text-[9.5px] px-1.5 py-1 rounded transition duration-150 active:scale-[0.99] flex flex-col gap-0.5 cursor-pointer outline-none shadow-3xs ${borderLeftClass} ${statusBg} ${searchOpacity}`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-1">
@@ -878,7 +915,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                         </span>
                         <span className="font-mono text-[8px] font-bold opacity-60">#{t.id}</span>
                       </div>
-                      
+
                       {/* Overdue/Due soon tag indicators */}
                       {isOverdue && (
                         <span className="bg-red-600 text-white text-[7px] px-1 rounded font-black uppercase tracking-wider scale-90">
@@ -929,7 +966,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
       const dayTasks = getTasksOnDay(day);
       total += dayTasks.length;
       dayTasks.forEach(t => {
-        if (t.trangThai === 'Hoàn thành đúng hạn' || t.trangThai === 'Hoàn thành trễ hạn') {
+        if (getTaskStatusInfo(t).isCompleted) {
           completed++;
         } else if (t.trangThai === 'Chưa hoàn thành') {
           incomplete++;
@@ -955,14 +992,33 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
           <span className="text-[11px] text-slate-400 font-medium hidden md:inline">| Theo dõi thời hạn trực quan</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm nhiệm vụ..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-[#a3212e] focus:outline-none transition"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
           {/* Collapse/Expand Filters */}
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 outline-none cursor-pointer border ${
-              showFilters
-                ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-                : 'bg-white border-slate-200 hover:border-[#a3212e] hover:text-[#a3212e] text-[#0f2444]'
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 outline-none cursor-pointer border ${showFilters
+              ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+              : 'bg-white border-slate-200 hover:border-[#a3212e] hover:text-[#a3212e] text-[#0f2444]'
+              }`}
           >
             <span>{showFilters ? '🙈 Ẩn Bộ lọc & Chú thích' : '🔍 Hiện Bộ lọc & Chú thích'}</span>
           </button>
@@ -970,11 +1026,10 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
           {/* Collapse/Expand stats button */}
           <button
             onClick={() => setShowStats(!showStats)}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 outline-none cursor-pointer border ${
-              showStats
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
-                : 'bg-white border-slate-200 hover:border-[#a3212e] hover:text-[#a3212e] text-[#0f2444]'
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 outline-none cursor-pointer border ${showStats
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+              : 'bg-white border-slate-200 hover:border-[#a3212e] hover:text-[#a3212e] text-[#0f2444]'
+              }`}
           >
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 ${showStats ? 'hidden' : ''}`}></span>
@@ -1023,7 +1078,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
               <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
             </span>
             <span className="text-xs font-semibold">
-              Đang ở chế độ <strong>Gán hạn nhanh</strong> cho nhiệm vụ <strong className="font-mono bg-amber-100 px-1.5 py-0.5 rounded text-[#0f2444]">{quickAssignTask.task.id}</strong>: <i>"{quickAssignTask.task.noiDung.substring(0, 100)}..."</i>. 
+              Đang ở chế độ <strong>Gán hạn nhanh</strong> cho nhiệm vụ <strong className="font-mono bg-amber-100 px-1.5 py-0.5 rounded text-[#0f2444]">{quickAssignTask.task.id}</strong>: <i>"{quickAssignTask.task.noiDung.substring(0, 100)}..."</i>.
               <br />
               <span className="text-amber-700 font-medium">👉 Hãy nhấn vào bất kỳ ô ngày nào trên bảng lịch dưới đây để gán nhanh thời hạn.</span>
             </span>
@@ -1045,36 +1100,96 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div className="flex flex-wrap items-center gap-2 font-display font-bold text-base text-[#0f2444]">
               <CalendarIcon className="w-5 h-5 text-[#a3212e] shrink-0" />
-              
-              {/* Quick Select Month */}
-              <select
-                value={currentMonth}
-                onChange={(e) => setCurrentMonth(Number(e.target.value))}
-                className="bg-slate-100 hover:bg-slate-200/80 border border-slate-300 text-[#0f2444] font-extrabold text-sm rounded-xl px-2 py-1 outline-none cursor-pointer transition shadow-2xs focus:ring-2 focus:ring-[#a3212e]/20"
-                title="Chọn nhanh Tháng"
-              >
-                {months.map((mName, mIdx) => (
-                  <option key={mIdx} value={mIdx}>
-                    {mName}
-                  </option>
-                ))}
-              </select>
 
-              <span className="text-slate-400 font-bold">/</span>
+              {/* Prev/Next now sit right beside what they control (Tháng/Năm), instead of being separated across the header */}
+              <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200 p-0.5 rounded-xl">
+                <button
+                  onClick={prevDate}
+                  className="p-1 hover:bg-white hover:shadow-sm rounded-lg text-slate-600 transition cursor-pointer outline-none"
+                  title="Trở lại"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
 
-              {/* Quick Select Year */}
-              <select
-                value={currentYear}
-                onChange={(e) => setCurrentYear(Number(e.target.value))}
-                className="bg-slate-100 hover:bg-slate-200/80 border border-slate-300 text-[#0f2444] font-extrabold text-sm rounded-xl px-2 py-1 outline-none cursor-pointer transition shadow-2xs focus:ring-2 focus:ring-[#a3212e]/20"
-                title="Chọn nhanh Năm"
-              >
-                {Array.from({ length: 15 }, (_, i) => 2022 + i).map((y) => (
-                  <option key={y} value={y}>
-                    Năm {y}
-                  </option>
-                ))}
-              </select>
+                {/* Month/Year quick picker */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMonthPicker(v => !v)}
+                    className="flex items-center gap-1 hover:bg-white hover:shadow-sm text-[#0f2444] font-extrabold text-sm rounded-lg px-2 py-1 outline-none cursor-pointer transition"
+                    title="Chọn nhanh Tháng/Năm"
+                  >
+                    <span>{months[currentMonth]}, {currentYear}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showMonthPicker ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showMonthPicker && (
+                    <>
+                      {/* Click-outside backdrop */}
+                      <div className="fixed inset-0 z-40" onClick={() => setShowMonthPicker(false)} />
+
+                      <div className="absolute top-full left-0 mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-lg p-3 w-60 animate-fade-in">
+                        {/* Year stepper */}
+                        <div className="flex items-center justify-between mb-2.5">
+                          <button
+                            onClick={() => setCurrentYear(y => y - 1)}
+                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer transition"
+                            title="Năm trước"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-xs font-extrabold text-[#0f2444] tracking-wide">Năm {currentYear}</span>
+                          <button
+                            onClick={() => setCurrentYear(y => y + 1)}
+                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 cursor-pointer transition"
+                            title="Năm sau"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Month grid */}
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {months.map((mName, mIdx) => {
+                            const isSelected = mIdx === currentMonth;
+                            const isRealToday = mIdx === today.getMonth() && currentYear === today.getFullYear();
+                            return (
+                              <button
+                                key={mIdx}
+                                onClick={() => { setCurrentMonth(mIdx); setShowMonthPicker(false); }}
+                                className={`relative px-1.5 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer outline-none ${isSelected
+                                  ? 'bg-[#a3212e] text-white shadow-xs'
+                                  : 'text-slate-600 hover:bg-slate-100'
+                                  }`}
+                                title={isRealToday ? `${mName} — tháng hiện tại` : mName}
+                              >
+                                {mName.replace('Tháng ', 'Th ')}
+                                {isRealToday && !isSelected && (
+                                  <span className="absolute top-1 right-1 w-1 h-1 rounded-full bg-emerald-500" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() => { setCurrentYear(today.getFullYear()); setCurrentMonth(today.getMonth()); setShowMonthPicker(false); }}
+                          className="mt-2.5 w-full text-center text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 rounded-lg py-1.5 cursor-pointer transition"
+                        >
+                          📍 Về tháng hiện tại
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  onClick={nextDate}
+                  className="p-1 hover:bg-white hover:shadow-sm rounded-lg text-slate-600 transition cursor-pointer outline-none"
+                  title="Tiếp theo"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
               {/* Today Button */}
               <button
@@ -1091,11 +1206,10 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
               {/* Expand Calendar Workspace / Toggle Sidebar Button */}
               <button
                 onClick={() => setShowRightSidebar(!showRightSidebar)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold transition border cursor-pointer outline-none shadow-xs ${
-                  showRightSidebar
-                    ? 'bg-white border-slate-200 hover:border-[#a3212e] text-slate-700 hover:text-[#a3212e]'
-                    : 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'
-                }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold transition border cursor-pointer outline-none shadow-xs ${showRightSidebar
+                  ? 'bg-white border-slate-200 hover:border-[#a3212e] text-slate-700 hover:text-[#a3212e]'
+                  : 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'
+                  }`}
                 title={showRightSidebar ? "Mở rộng lịch (Ẩn cột chưa xếp lịch)" : "Hiện cột việc chưa xếp lịch"}
               >
                 <span>{showRightSidebar ? "📂 Thu gọn việc" : "📂 Hiện việc chưa xếp"}</span>
@@ -1105,31 +1219,37 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
               <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-xl border border-slate-200/50">
                 <button
                   onClick={() => setViewMode('month')}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${
-                    viewMode === 'month'
-                      ? 'bg-white text-[#0f2444] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${viewMode === 'month'
+                    ? 'bg-white text-[#0f2444] shadow-xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
                 >
                   Tháng
                 </button>
                 <button
                   onClick={() => setViewMode('week')}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${
-                    viewMode === 'week'
-                      ? 'bg-white text-[#0f2444] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${viewMode === 'week'
+                    ? 'bg-white text-[#0f2444] shadow-xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
                 >
                   Tuần
                 </button>
                 <button
+                  onClick={() => setViewMode('day')}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${viewMode === 'day'
+                    ? 'bg-white text-[#0f2444] shadow-xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                >
+                  Ngày
+                </button>
+                <button
                   onClick={() => setViewMode('agenda')}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${
-                    viewMode === 'agenda'
-                      ? 'bg-white text-[#0f2444] shadow-xs'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${viewMode === 'agenda'
+                    ? 'bg-white text-[#0f2444] shadow-xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
                 >
                   Danh sách
                 </button>
@@ -1139,13 +1259,6 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
               {viewMode === 'day' && (
                 <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-[#a3212e] px-2.5 py-1 rounded-xl text-[10px] font-bold animate-fade-in shadow-2xs">
                   <span>Chi tiết ngày {currentDay}/{currentMonth + 1}/{currentYear}</span>
-                  <button
-                    onClick={() => setViewMode('month')}
-                    className="hover:bg-rose-100 p-0.5 rounded transition cursor-pointer text-rose-700"
-                    title="Đóng xem ngày - Trở về xem Tháng"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
                 </div>
               )}
 
@@ -1153,45 +1266,26 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
               <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-xl border border-slate-200/50">
                 <button
                   onClick={() => setCalendarDateMode('deadline')}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${
-                    calendarDateMode === 'deadline'
-                      ? 'bg-white text-[#a3212e] shadow-xs font-semibold'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${calendarDateMode === 'deadline'
+                    ? 'bg-white text-[#a3212e] shadow-xs font-semibold'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
                   title="Hiển thị nhiệm vụ lên ô lịch dựa theo ngày hết hạn (hạn văn bản)"
                 >
                   ⏳ Theo hạn
                 </button>
                 <button
                   onClick={() => setCalendarDateMode('issue')}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${
-                    calendarDateMode === 'issue'
-                      ? 'bg-white text-[#a3212e] shadow-xs font-semibold'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer outline-none ${calendarDateMode === 'issue'
+                    ? 'bg-white text-[#a3212e] shadow-xs font-semibold'
+                    : 'text-slate-500 hover:text-slate-700'
+                    }`}
                   title="Hiển thị nhiệm vụ lên ô lịch dựa theo ngày ban hành văn bản"
                 >
                   📅 Theo ngày BH
                 </button>
               </div>
 
-              {/* Navigation button controllers */}
-              <div className="flex items-center gap-1 border border-slate-200 p-0.5 rounded-xl bg-slate-50">
-                <button 
-                  onClick={prevDate}
-                  className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-slate-600 transition cursor-pointer outline-none"
-                  title="Trở lại"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button 
-                  onClick={nextDate}
-                  className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-slate-600 transition cursor-pointer outline-none"
-                  title="Tiếp theo"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
             </div>
           </div>
 
@@ -1202,7 +1296,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                 <span className="text-[10px] font-bold text-[#0f2444] tracking-wider uppercase">
                   ⚙️ Bộ lọc hiển thị & Chú thích trạng thái
                 </span>
-                
+
                 {/* Status Legend rendered here cleanly */}
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[9.5px] text-slate-500 font-semibold bg-white px-2.5 py-1 rounded-lg border border-slate-200">
                   <span className="flex items-center gap-1">
@@ -1350,13 +1444,12 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                 const isSat = day === 'T7';
                 const isSun = day === 'CN';
                 return (
-                  <div 
-                    key={day} 
-                    className={`text-center font-display font-bold text-xs py-1.5 border border-slate-100 rounded ${
-                      isSun ? 'text-rose-600 bg-rose-50/40 border-rose-100/50' :
+                  <div
+                    key={day}
+                    className={`text-center font-display font-bold text-xs py-1.5 border border-slate-100 rounded ${isSun ? 'text-rose-600 bg-rose-50/40 border-rose-100/50' :
                       isSat ? 'text-sky-600 bg-sky-50/20 border-sky-100/40' :
-                      'text-slate-400 bg-slate-50'
-                    }`}
+                        'text-slate-400 bg-slate-50'
+                      }`}
                   >
                     {day}
                   </div>
@@ -1372,16 +1465,16 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
             <div className="grid grid-cols-1 md:grid-cols-7 gap-3 min-h-[500px]">
               {getDaysOfActiveWeek().map(dayObj => {
                 const dayTasks = getTasksOnFullDate(dayObj.yearNum, dayObj.monthNum, dayObj.dayNum);
-                const isToday = 
-                  new Date().getDate() === dayObj.dayNum && 
-                  new Date().getMonth() === dayObj.monthNum && 
+                const isToday =
+                  new Date().getDate() === dayObj.dayNum &&
+                  new Date().getMonth() === dayObj.monthNum &&
                   new Date().getFullYear() === dayObj.yearNum;
 
                 const isSun = dayObj.date.getDay() === 0;
                 const isSat = dayObj.date.getDay() === 6;
 
                 return (
-                  <div 
+                  <div
                     key={dayObj.dateString}
                     title="Nhấn vào ngày này để xem chi tiết theo Ngày"
                     onClick={() => {
@@ -1428,22 +1521,20 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                         console.error(err);
                       }
                     }}
-                    className={`flex flex-col rounded-xl border p-2.5 transition duration-200 min-h-[400px] cursor-pointer ${
-                      isToday 
-                        ? 'bg-rose-50/20 border-[#a3212e] ring-1 ring-[#a3212e]' 
-                        : isSun 
-                          ? 'bg-rose-50/10 border-rose-100 hover:bg-rose-50/20' 
-                          : isSat 
-                            ? 'bg-sky-50/10 border-sky-100 hover:bg-sky-50/20' 
-                            : 'bg-slate-50/40 border-slate-200 hover:bg-slate-50'
-                    }`}
+                    className={`flex flex-col rounded-xl border p-2.5 transition duration-200 min-h-[400px] cursor-pointer ${isToday
+                      ? 'bg-rose-50/20 border-[#a3212e] ring-1 ring-[#a3212e]'
+                      : isSun
+                        ? 'bg-rose-50/10 border-rose-100 hover:bg-rose-50/20'
+                        : isSat
+                          ? 'bg-sky-50/10 border-sky-100 hover:bg-sky-50/20'
+                          : 'bg-slate-50/40 border-slate-200 hover:bg-slate-50'
+                      }`}
                   >
                     {/* Header */}
                     <div className="border-b border-slate-100 pb-1.5 mb-2 flex items-center justify-between">
                       <div className="flex flex-col">
-                        <span className={`text-[10px] font-bold ${
-                          isSun ? 'text-rose-600' : isSat ? 'text-sky-600' : 'text-slate-500'
-                        }`}>
+                        <span className={`text-[10px] font-bold ${isSun ? 'text-rose-600' : isSat ? 'text-sky-600' : 'text-slate-500'
+                          }`}>
                           {dayObj.label}
                         </span>
                         <span className="text-xs font-black text-slate-800">
@@ -1463,7 +1554,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                         </div>
                       ) : (
                         dayTasks.map(task => (
-                          <div 
+                          <div
                             key={`${task.section}-${task.id}`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1485,11 +1576,10 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                               {task.noiDung}
                             </p>
                             <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-50">
-                              <span className={`w-2 h-2 rounded-full ${
-                                task.trangThai === 'Hoàn thành đúng hạn' ? 'bg-emerald-500' :
-                                task.trangThai === 'Hoàn thành trễ hạn' ? 'bg-amber-500' :
-                                task.trangThai === 'Không áp dụng' ? 'bg-slate-400' : 'bg-rose-500'
-                              }`} title={task.trangThai || 'Chưa hoàn thành'} />
+                              <span className={`w-2 h-2 rounded-full ${getTaskStatusInfo(task).isCompleted && !getTaskStatusInfo(task).isLate ? 'bg-emerald-500' :
+                                getTaskStatusInfo(task).isCompleted && getTaskStatusInfo(task).isLate ? 'bg-amber-500' :
+                                  task.trangThai === 'Không áp dụng' ? 'bg-slate-400' : 'bg-rose-500'
+                                }`} title={task.trangThai || 'Chưa hoàn thành'} />
                               <span className="text-[8px] font-bold text-[#0f2444]">Sửa</span>
                             </div>
                           </div>
@@ -1503,7 +1593,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
           )}
 
           {viewMode === 'day' && (
-            <div 
+            <div
               onDragOver={(e) => {
                 e.preventDefault();
                 if (e.dataTransfer) {
@@ -1534,9 +1624,9 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
             >
               {(() => {
                 const dayTasks = getTasksOnFullDate(currentYear, currentMonth, currentDay);
-                const isToday = 
-                  new Date().getDate() === currentDay && 
-                  new Date().getMonth() === currentMonth && 
+                const isToday =
+                  new Date().getDate() === currentDay &&
+                  new Date().getMonth() === currentMonth &&
                   new Date().getFullYear() === currentYear;
 
                 return (
@@ -1575,7 +1665,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                     ) : (
                       <div className="grid grid-cols-1 gap-3">
                         {dayTasks.map(task => (
-                          <div 
+                          <div
                             key={`${task.section}-${task.id}`}
                             className="bg-white hover:bg-slate-50/50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition duration-150"
                           >
@@ -1598,7 +1688,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                                   </span>
                                 )}
                                 {task.trangThai && (
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${getStatusBg(task.trangThai)}`}>
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${getStatusBg(task)}`}>
                                     {task.trangThai}
                                   </span>
                                 )}
@@ -1693,11 +1783,10 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                       return (
                         <div key={dayNum} className="space-y-2 border-l-2 border-slate-200 pl-4 relative ml-2 text-left">
                           {/* Chronological Dot Indicator */}
-                          <div className={`absolute -left-[7px] top-1.5 w-3 h-3 rounded-full border border-white ${
-                            isSun ? 'bg-rose-500' : isSat ? 'bg-sky-500' : 'bg-slate-400'
-                          }`}></div>
+                          <div className={`absolute -left-[7px] top-1.5 w-3 h-3 rounded-full border border-white ${isSun ? 'bg-rose-500' : isSat ? 'bg-sky-500' : 'bg-slate-400'
+                            }`}></div>
 
-                          <h4 
+                          <h4
                             onClick={() => {
                               setCurrentDay(dayNum);
                               setViewMode('day');
@@ -1706,18 +1795,17 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                             className="font-display font-bold text-xs text-slate-700 flex items-center gap-2 cursor-pointer hover:text-[#a3212e] transition"
                           >
                             <span>Ngày {dayNum} tháng {currentMonth + 1}, {currentYear}</span>
-                            <span className={`text-[10px] px-1.5 py-0.25 rounded font-bold ${
-                              isSun ? 'bg-rose-50 text-rose-600' :
+                            <span className={`text-[10px] px-1.5 py-0.25 rounded font-bold ${isSun ? 'bg-rose-50 text-rose-600' :
                               isSat ? 'bg-sky-50 text-sky-600' :
-                              'bg-slate-100 text-slate-500'
-                            }`}>
+                                'bg-slate-100 text-slate-500'
+                              }`}>
                               {dayOfWeek === 0 ? 'Chủ Nhật' : dayOfWeek === 6 ? 'Thứ Bảy' : `Thứ ${dayOfWeek + 1}`}
                             </span>
                           </h4>
 
                           <div className="space-y-2">
                             {groupedByDay[dayNum].map(task => (
-                              <div 
+                              <div
                                 key={`${task.section}-${task.id}`}
                                 className="bg-slate-50 hover:bg-[#0f2444]/5 border border-slate-200/60 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-4 transition duration-200"
                               >
@@ -1733,7 +1821,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                                     )}
                                     <span className="text-[9px] text-slate-450 font-semibold font-mono">Mục {task.section}</span>
                                     {task.trangThai && (
-                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${getStatusBg(task.trangThai)}`}>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${getStatusBg(task)}`}>
                                         {task.trangThai}
                                       </span>
                                     )}
@@ -1792,70 +1880,69 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                 </p>
               </div>
 
-          {/* Tasks list */}
-          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar">
-            {unscheduledList.length === 0 ? (
-              <div className="text-center py-8 text-slate-300 font-bold text-[10px]">
-                Đã xếp lịch toàn bộ.
-              </div>
-            ) : (
-              unscheduledList.map(task => (
-                <div
-                  key={`${task.section}-${task.id}`}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('text/plain', JSON.stringify({
-                      section: task.section,
-                      originalIndex: task.originalIndex
-                    }));
-                    if (e.dataTransfer) {
-                      e.dataTransfer.effectAllowed = 'move';
-                    }
-                  }}
-                  className="bg-slate-50/75 hover:bg-[#0f2444]/5 border border-slate-150 rounded-lg p-2.5 text-left transition duration-200 space-y-1.5 group cursor-grab active:cursor-grabbing"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <span className="bg-[#0f2444] text-white text-[8px] font-mono font-bold px-1 py-0.25 rounded">
-                        {task.id}
-                      </span>
-                      {task.donVi && (
-                        <span className="bg-slate-200/85 text-slate-600 text-[8px] font-bold px-1 py-0.25 rounded truncate max-w-[80px]">
-                          {task.donVi}
-                        </span>
-                      )}
+              {/* Tasks list */}
+              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar">
+                {unscheduledList.length === 0 ? (
+                  <div className="text-center py-8 text-slate-300 font-bold text-[10px]">
+                    Đã xếp lịch toàn bộ.
+                  </div>
+                ) : (
+                  unscheduledList.map(task => (
+                    <div
+                      key={`${task.section}-${task.id}`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({
+                          section: task.section,
+                          originalIndex: task.originalIndex
+                        }));
+                        if (e.dataTransfer) {
+                          e.dataTransfer.effectAllowed = 'move';
+                        }
+                      }}
+                      className="bg-slate-50/75 hover:bg-[#0f2444]/5 border border-slate-150 rounded-lg p-2.5 text-left transition duration-200 space-y-1.5 group cursor-grab active:cursor-grabbing"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <span className="bg-[#0f2444] text-white text-[8px] font-mono font-bold px-1 py-0.25 rounded">
+                            {task.id}
+                          </span>
+                          {task.donVi && (
+                            <span className="bg-slate-200/85 text-slate-600 text-[8px] font-bold px-1 py-0.25 rounded truncate max-w-[80px]">
+                              {task.donVi}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[8px] text-slate-400 font-semibold font-mono">Mục {task.section}</span>
+                      </div>
+                      <p className="text-[11px] font-medium text-slate-600 leading-relaxed line-clamp-2">
+                        {task.noiDung}
+                      </p>
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/50">
+                        <button
+                          onClick={() => handleOpenEdit(task.section, task.originalIndex, task)}
+                          className="flex-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-[9px] py-1 rounded-md transition text-center cursor-pointer outline-none shadow-xs"
+                        >
+                          Sửa chi tiết
+                        </button>
+                        <button
+                          onClick={() => setQuickAssignTask({ section: task.section, originalIndex: task.originalIndex, task })}
+                          className={`flex-1 font-bold text-[9px] py-1 rounded-md transition text-center cursor-pointer outline-none border ${quickAssignTask?.task.id === task.id
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-[#a3212e] hover:bg-[#8d1c27] text-white border-[#a3212e]'
+                            }`}
+                        >
+                          {quickAssignTask?.task.id === task.id ? 'Hủy gán' : 'Gán nhanh'}
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-[8px] text-slate-400 font-semibold font-mono">Mục {task.section}</span>
-                  </div>
-                  <p className="text-[11px] font-medium text-slate-600 leading-relaxed line-clamp-2">
-                    {task.noiDung}
-                  </p>
-                  <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/50">
-                    <button
-                      onClick={() => handleOpenEdit(task.section, task.originalIndex, task)}
-                      className="flex-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-[9px] py-1 rounded-md transition text-center cursor-pointer outline-none shadow-xs"
-                    >
-                      Sửa chi tiết
-                    </button>
-                    <button
-                      onClick={() => setQuickAssignTask({ section: task.section, originalIndex: task.originalIndex, task })}
-                      className={`flex-1 font-bold text-[9px] py-1 rounded-md transition text-center cursor-pointer outline-none border ${
-                        quickAssignTask?.task.id === task.id
-                          ? 'bg-amber-100 text-amber-800 border-amber-300'
-                          : 'bg-[#a3212e] hover:bg-[#8d1c27] text-white border-[#a3212e]'
-                      }`}
-                    >
-                      {quickAssignTask?.task.id === task.id ? 'Hủy gán' : 'Gán nhanh'}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    )}
-  </div>
 
       {/* Detail Modal */}
       {selectedTask && (
@@ -1871,7 +1958,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                   Chỉnh sửa nhiệm vụ Lịch trình Mục {selectedTask.section}
                 </span>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedTask(null)}
                 className="text-white hover:bg-white/10 p-1.5 rounded-lg cursor-pointer outline-none transition"
               >
@@ -1881,10 +1968,10 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
 
             {/* Body Form */}
             <div className="p-6 space-y-5 overflow-y-auto flex-1 custom-scrollbar text-xs">
-              
+
               {/* THREE COLUMN GRID FOR FORM SECTIONS */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-                
+
                 {/* COLUMN 1: SECTION I - THÔNG TIN VĂN BẢN GỐC (Document Metadata) */}
                 <div className="order-1 bg-[#fcfcfc] border border-slate-200/80 rounded-xl p-4 space-y-4">
                   <span className="text-xs font-bold text-[#0f2444] tracking-wider uppercase block border-b border-slate-200/60 pb-1.5">
@@ -1999,16 +2086,15 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                       <button
                         type="button"
                         onClick={() => handleCATToggle(!isFromCAT)}
-                        className={`w-full flex items-center justify-center px-1 py-2 rounded-lg border transition cursor-pointer h-[38px] ${
-                          isFromCAT
-                            ? 'bg-red-50 border-red-300 text-[#a3212e] shadow-sm'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                        className={`w-full flex items-center justify-center px-1 py-2 rounded-lg border transition cursor-pointer h-[38px] ${isFromCAT
+                          ? 'bg-red-50 border-red-300 text-[#a3212e] shadow-sm'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
                       >
                         <input
                           type="checkbox"
                           checked={isFromCAT}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="rounded text-[#a3212e] focus:ring-[#a3212e] cursor-pointer w-4 h-4"
                         />
                       </button>
@@ -2079,8 +2165,8 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                             type="date"
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             value={ngay}
-                            onClick={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) {} }}
-                            onFocus={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) {} }}
+                            onClick={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) { } }}
+                            onFocus={(e) => { e.stopPropagation(); try { e.currentTarget.showPicker(); } catch (err) { } }}
                             onChange={(e) => {
                               const val = e.target.value;
                               setNgay(val);
@@ -2221,13 +2307,12 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                         {/* Dynamic live result badge */}
                         {(() => {
                           const autoStat = computeAutoStatus('hoan_thanh', ngayHoanThanh || getTodayDateString(), ngayHetHan);
-                          const isLate = autoStat === 'Hoàn thành trễ hạn';
+                          const isLate = autoStat.startsWith('Hoàn thành trễ hạn');
                           return (
-                            <div className={`p-2 rounded text-[11px] font-bold flex items-center justify-between border ${
-                              isLate 
-                                ? 'bg-amber-100 text-amber-900 border-amber-300' 
-                                : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                            }`}>
+                            <div className={`p-2 rounded text-[11px] font-bold flex items-center justify-between border ${isLate
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                              }`}>
                               <span>Kết quả hệ thống tự tính:</span>
                               <span className="font-extrabold uppercase">
                                 {isLate ? '⚠️ Hoàn thành trễ hạn' : '✅ Hoàn thành đúng hạn'}
@@ -2242,22 +2327,14 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                   {/* Sản phẩm */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">
-                      Sản phẩm <span className="text-slate-400 font-normal text-[10px]">(nếu có sản phẩm phúc đáp, trạng thái sẽ tự động chuyển sang hoàn thành)</span>
+                      Sản phẩm <span className="text-slate-400 font-normal text-[10px]">(không tự động đổi trạng thái — muốn đánh dấu hoàn thành, chọn "Đã hoàn thành" ở trên)</span>
                     </label>
                     <input
                       type="text"
                       className="w-full bg-white border border-slate-200 focus:border-[#a3212e] text-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-medium outline-none transition"
                       placeholder="Ví dụ: Báo cáo số 12/BC-TTH, Kế hoạch..."
                       value={sanPham}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSanPham(val);
-                        if (val.trim() !== '') {
-                          if (!trangThai || trangThai === 'Chưa hoàn thành') {
-                            setTrangThai('Hoàn thành đúng hạn');
-                          }
-                        }
-                      }}
+                      onChange={(e) => setSanPham(e.target.value)}
                     />
                   </div>
                 </div>
@@ -2343,7 +2420,7 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                           <option value="Tổ Cảnh sát phòng chống tội phạm">Tổ Cảnh sát phòng chống tội phạm</option>
                           <option value="other">— Nhập tay / Đơn vị tùy chỉnh —</option>
                         </select>
-                        
+
                         {(![
                           'Tổ Tổng hợp',
                           'Tổ An ninh',
@@ -2351,14 +2428,14 @@ export default function CalendarView({ state, updateTaskBC }: CalendarViewProps)
                           'Tổ Cảnh sát khu vực',
                           'Tổ Cảnh sát phòng chống tội phạm'
                         ].includes(donVi) || donVi === '') && (
-                          <input
-                            type="text"
-                            className="w-full bg-white border border-slate-200 focus:border-[#a3212e] text-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-medium outline-none transition mt-1.5"
-                            placeholder="Nhập tên đơn vị/cá nhân thực hiện..."
-                            value={donVi}
-                            onChange={(e) => setDonVi(e.target.value)}
-                          />
-                        )}
+                            <input
+                              type="text"
+                              className="w-full bg-white border border-slate-200 focus:border-[#a3212e] text-slate-800 px-2.5 py-1.5 rounded-lg text-xs font-medium outline-none transition mt-1.5"
+                              placeholder="Nhập tên đơn vị/cá nhân thực hiện..."
+                              value={donVi}
+                              onChange={(e) => setDonVi(e.target.value)}
+                            />
+                          )}
                       </div>
 
                       {/* Đơn vị theo dõi & Điểm thi đua */}

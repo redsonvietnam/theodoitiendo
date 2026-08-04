@@ -16,7 +16,7 @@ import {
   FileCode
 } from 'lucide-react';
 import { AppState, TaskA, TaskBC, TaskD } from '../types';
-import { parseCanCu } from '../utils/cancu';
+import { parseCanCu, getTaskStatusInfo } from '../utils/cancu';
 
 interface ExcelIOProps {
   state: AppState;
@@ -60,8 +60,8 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
   };
 
   const pointsBC = (row: TaskBC) => {
-    if (row.trangThai === 'Hoàn thành đúng hạn') return row.diemGiao;
-    if (row.trangThai === 'Hoàn thành trễ hạn') return row.diemGiao * 0.5;
+    const info = getTaskStatusInfo(row);
+    if (info.isCompleted) return info.isLate ? row.diemGiao * 0.5 : row.diemGiao;
     if (row.trangThai === 'Chưa hoàn thành') return 0;
     return null;
   };
@@ -86,10 +86,24 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
       const thangNum = parseInt(metaThangParts[0], 10) || 7;
       const namNum = parseInt(metaThangParts[1], 10) || 2026;
 
+      // Classify a task into the same 5 buckets the "Trạng thái nhiệm vụ xuất" checkboxes represent.
+      // IMPORTANT: task.trangThai is never literally "Hoàn thành đúng hạn" or "Hoàn thành trễ hạn"
+      // for tasks completed through the app itself — computeAutoStatus stores bare "Hoàn thành"
+      // (on-time) or "Hoàn thành trễ hạn N ngày" (late, with a day-count suffix). Matching the raw
+      // string directly against the filter's literal values would silently drop those tasks from
+      // the export even when their checkbox is checked.
+      const classifyStatusForExport = (task: TaskBC): string => {
+        const info = getTaskStatusInfo(task);
+        if (info.isCompleted) return info.isLate ? 'Hoàn thành trễ hạn' : 'Hoàn thành đúng hạn';
+        if (task.trangThai === 'Không áp dụng') return 'Không áp dụng';
+        if (task.trangThai === 'Chưa hoàn thành') return 'Chưa hoàn thành';
+        return '';
+      };
+
       // 2. Date and status filtering helper
       const filterTaskByDateAndStatus = (task: TaskBC) => {
         // Status filter
-        const statusMatch = selectedStatuses.includes(task.trangThai || '');
+        const statusMatch = selectedStatuses.includes(classifyStatusForExport(task));
         if (!statusMatch) return false;
 
         // Date filter
@@ -355,7 +369,7 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
           secIIStartRow = rIdx;
           exportB.forEach(r => {
             const showDiemSoLuong = r.diemSoLuong !== undefined ? r.diemSoLuong : (
-              r.trangThai === 'Hoàn thành đúng hạn' ? r.diemGiao : (r.trangThai === 'Hoàn thành trễ hạn' ? r.diemGiao * 0.5 : '')
+              (getTaskStatusInfo(r).isCompleted ? (getTaskStatusInfo(r).isLate ? r.diemGiao * 0.5 : r.diemGiao) : '')
             );
             const showDiemChatLuong = r.diemChatLuong !== undefined ? r.diemChatLuong : '';
             const showDiemTienDo = r.diemTienDo !== undefined ? r.diemTienDo : '';
@@ -397,7 +411,7 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
           secIIIStartRow = rIdx;
           exportC.forEach(r => {
             const showDiemSoLuong = r.diemSoLuong !== undefined ? r.diemSoLuong : (
-              r.trangThai === 'Hoàn thành đúng hạn' ? r.diemGiao : (r.trangThai === 'Hoàn thành trễ hạn' ? r.diemGiao * 0.5 : '')
+              (getTaskStatusInfo(r).isCompleted ? (getTaskStatusInfo(r).isLate ? r.diemGiao * 0.5 : r.diemGiao) : '')
             );
             const showDiemChatLuong = r.diemChatLuong !== undefined ? r.diemChatLuong : '';
             const showDiemTienDo = r.diemTienDo !== undefined ? r.diemTienDo : '';
@@ -690,7 +704,7 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
           const startB = r2;
           exportB.forEach(r => {
             const showDiemSoLuong = r.diemSoLuong !== undefined ? r.diemSoLuong : (
-              r.trangThai === 'Hoàn thành đúng hạn' ? r.diemGiao : (r.trangThai === 'Hoàn thành trễ hạn' ? r.diemGiao * 0.5 : '')
+              (getTaskStatusInfo(r).isCompleted ? (getTaskStatusInfo(r).isLate ? r.diemGiao * 0.5 : r.diemGiao) : '')
             );
             const showDiemChatLuong = r.diemChatLuong !== undefined ? r.diemChatLuong : '';
             const showDiemTienDo = r.diemTienDo !== undefined ? r.diemTienDo : '';
@@ -750,7 +764,7 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
           const startC = r3;
           exportC.forEach(r => {
             const showDiemSoLuong = r.diemSoLuong !== undefined ? r.diemSoLuong : (
-              r.trangThai === 'Hoàn thành đúng hạn' ? r.diemGiao : (r.trangThai === 'Hoàn thành trễ hạn' ? r.diemGiao * 0.5 : '')
+              (getTaskStatusInfo(r).isCompleted ? (getTaskStatusInfo(r).isLate ? r.diemGiao * 0.5 : r.diemGiao) : '')
             );
             const showDiemChatLuong = r.diemChatLuong !== undefined ? r.diemChatLuong : '';
             const showDiemTienDo = r.diemTienDo !== undefined ? r.diemTienDo : '';

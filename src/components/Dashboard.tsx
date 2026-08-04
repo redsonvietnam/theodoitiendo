@@ -19,7 +19,7 @@ import {
   Layers
 } from 'lucide-react';
 import { AppState, TaskBC } from '../types';
-import { parseCanCu } from '../utils/cancu';
+import { parseCanCu, getTaskStatusInfo } from '../utils/cancu';
 
 interface DashboardProps {
   state: AppState;
@@ -49,9 +49,9 @@ export default function Dashboard({
 
   // Helper for B & C points calculation
   const getPointsBC = (row: TaskBC) => {
-    if (row.trangThai === 'Hoàn thành đúng hạn') return row.diemGiao;
-    if (row.trangThai === 'Hoàn thành trễ hạn') return row.diemGiao * 0.5;
-    return 0;
+    const info = getTaskStatusInfo(row);
+    if (!info.isCompleted) return 0;
+    return info.isLate ? row.diemGiao * 0.5 : row.diemGiao;
   };
 
   // 2. Calculate B metrics
@@ -75,8 +75,7 @@ export default function Dashboard({
   const overdueBC = allBC.filter(r => 
     r.ngayHetHan && 
     r.ngayHetHan < todayISO && 
-    r.trangThai !== 'Hoàn thành đúng hạn' && 
-    r.trangThai !== 'Hoàn thành trễ hạn' &&
+    !getTaskStatusInfo(r).isCompleted &&
     r.trangThai !== 'Không áp dụng'
   );
 
@@ -87,8 +86,7 @@ export default function Dashboard({
       dLeft !== null && 
       dLeft >= 0 && 
       dLeft <= 7 && 
-      r.trangThai !== 'Hoàn thành đúng hạn' && 
-      r.trangThai !== 'Hoàn thành trễ hạn' &&
+      !getTaskStatusInfo(r).isCompleted &&
       r.trangThai !== 'Không áp dụng'
     );
   });
@@ -221,12 +219,28 @@ export default function Dashboard({
     'Chưa cập nhật': '#cbd5e1' // gray
   };
 
-  const statusesBC = ['Hoàn thành đúng hạn', 'Hoàn thành trễ hạn', 'Chưa hoàn thành', 'Không áp dụng'] as const;
-  const segmentsBC: { value: number; color: string; label: string }[] = statusesBC.map(status => ({
-    value: allBC.filter(r => r.trangThai === status).length,
-    color: statColorsBC[status],
-    label: status
-  }));
+  const segmentsBC: { value: number; color: string; label: string }[] = [
+    {
+      value: allBC.filter(r => getTaskStatusInfo(r).isCompleted && !getTaskStatusInfo(r).isLate).length,
+      color: statColorsBC['Hoàn thành đúng hạn'],
+      label: 'Hoàn thành đúng hạn'
+    },
+    {
+      value: allBC.filter(r => getTaskStatusInfo(r).isCompleted && getTaskStatusInfo(r).isLate).length,
+      color: statColorsBC['Hoàn thành trễ hạn'],
+      label: 'Hoàn thành trễ hạn'
+    },
+    {
+      value: allBC.filter(r => !getTaskStatusInfo(r).isCompleted && r.trangThai === 'Chưa hoàn thành').length,
+      color: statColorsBC['Chưa hoàn thành'],
+      label: 'Chưa hoàn thành'
+    },
+    {
+      value: allBC.filter(r => r.trangThai === 'Không áp dụng').length,
+      color: statColorsBC['Không áp dụng'],
+      label: 'Không áp dụng'
+    }
+  ];
   segmentsBC.push({
     value: allBC.filter(r => !r.trangThai).length,
     color: statColorsBC['Chưa cập nhật'],
@@ -256,7 +270,7 @@ export default function Dashboard({
 
   // Upcoming items from B and C with deadlines
   const urgentItems = allBC
-    .filter(r => r.ngayHetHan && r.trangThai !== 'Hoàn thành đúng hạn' && r.trangThai !== 'Hoàn thành trễ hạn')
+    .filter(r => r.ngayHetHan && !getTaskStatusInfo(r).isCompleted)
     .map(r => ({ ...r, dLeft: daysUntil(r.ngayHetHan) }))
     .sort((a, b) => {
       if (a.dLeft === null) return 1;

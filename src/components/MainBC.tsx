@@ -4,17 +4,17 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Calendar, 
-  Award, 
-  FileText, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  X, 
-  Save, 
+import {
+  Search,
+  Filter,
+  Calendar,
+  Award,
+  FileText,
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+  Save,
   HelpCircle,
   Clock,
   CheckCircle,
@@ -28,7 +28,12 @@ import {
   Pin,
   Layers,
   RefreshCw,
-  Tag
+  Tag,
+  ArrowUp,
+  ArrowDown,
+  CalendarClock,
+  CalendarPlus,
+  List
 } from 'lucide-react';
 import { TaskBC, TaskMilestone } from '../types';
 import { compileCanCu, formatNgayBanHanh, isRecurringText, computeAutoStatus, cleanInlineText, formatParagraphText, getTaskNgayBanHanhTimestamp, getTaskNgayHetHanTimestamp, getTaskDeadlineISO, isTaskCompleted, hasValidProduct, getTodayDateString, getTaskStatusInfo } from '../utils/cancu';
@@ -166,9 +171,10 @@ export default function MainBC({
   const [filterSection, setFilterSection] = useState<'ALL' | 'B' | 'C'>('ALL');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterDeadline, setFilterDeadline] = useState('');
-  const [filterUnit, setFilterUnit] = useState('');
-  const [sortBy, setSortBy] = useState<'ngayHetHan_asc' | 'ngayHetHan_desc' | 'ngay_asc' | 'ngay_desc'>('ngayHetHan_asc');
+  const [filterDeadline, setFilterDeadline] = useState<'qua_han' | 'sap_den_han' | ''>('');
+  const [sortField, setSortField] = useState<'ngayHetHan' | 'ngay'>('ngayHetHan');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [cardViewStyle, setCardViewStyle] = useState<'grid' | 'list'>('grid');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -262,7 +268,7 @@ export default function MainBC({
     setTargetSection(sec);
     setEditingIndex(null);
     setShouldFocusProduct(focusProd);
-    
+
     setLoaiVanBan(sec === 'C' ? 'Báo cáo' : 'Kế hoạch');
     setSo('');
     setSoNumberOnly('');
@@ -283,13 +289,13 @@ export default function MainBC({
     setIsCompletedChoice('chua_hoan_thanh');
     setNgayHoanThanh(getTodayDateString());
     setQuickDateHoanThanh(formatToDDMMYY(getTodayDateString()));
-    
+
     setGioHetHan('00:00');
     setKieuThoiHan('truoc_ngay');
     setDonViTheoDoi('Phòng Tham mưu');
     setGhiChu('');
     setDanhSachMoc([]);
-    
+
     setIsExpanded(false);
     setIsModalOpen(true);
   };
@@ -322,7 +328,7 @@ export default function MainBC({
 
     const isDone = isTaskCompleted(task.trangThai || '');
     const isNa = task.trangThai === 'Không áp dụng' || task.trangThai === '-';
-    
+
     if (isNa) {
       setIsCompletedChoice('khong_ap_dung');
     } else if (isDone) {
@@ -382,8 +388,8 @@ export default function MainBC({
       so: finalSo,
       ngay: finalNgay,
       donViBanHanh,
-      trichYeu,
-      noiDung,
+      trichYeu: cleanInlineText(trichYeu),
+      noiDung: cleanInlineText(noiDung),
       thoiHan: finalThoiHan,
       diemGiao: Number(diemGiao),
       donVi,
@@ -459,8 +465,6 @@ export default function MainBC({
       if (filterDeadline === 'hom_nay' && info.key !== 'hom_nay') return false;
     }
 
-    if (filterUnit && task.donVi !== filterUnit) return false;
-
     return true;
   });
 
@@ -468,19 +472,14 @@ export default function MainBC({
   filteredList.sort((a, b) => {
     const tA = a.task;
     const tB = b.task;
-    if (sortBy === 'ngayHetHan_asc') {
-      return getTaskNgayHetHanTimestamp(tA) - getTaskNgayHetHanTimestamp(tB);
+    const valA = sortField === 'ngayHetHan' ? getTaskNgayHetHanTimestamp(tA) : getTaskNgayBanHanhTimestamp(tA);
+    const valB = sortField === 'ngayHetHan' ? getTaskNgayHetHanTimestamp(tB) : getTaskNgayBanHanhTimestamp(tB);
+
+    if (sortDirection === 'asc') {
+      return valA - valB;
+    } else {
+      return valB - valA;
     }
-    if (sortBy === 'ngayHetHan_desc') {
-      return getTaskNgayHetHanTimestamp(tB) - getTaskNgayHetHanTimestamp(tA);
-    }
-    if (sortBy === 'ngay_asc') {
-      return getTaskNgayBanHanhTimestamp(tA) - getTaskNgayBanHanhTimestamp(tB);
-    }
-    if (sortBy === 'ngay_desc') {
-      return getTaskNgayBanHanhTimestamp(tB) - getTaskNgayBanHanhTimestamp(tA);
-    }
-    return 0;
   });
 
   // Calculate statistics
@@ -496,25 +495,22 @@ export default function MainBC({
   const totalScoreCombined = totalScoreB + totalScoreC;
   const totalMaxScoreCombined = totalMaxScoreB + totalMaxScoreC;
 
-  // Extract unique departments for filtering
-  const allUnits = Array.from(new Set(combinedList.map(x => x.task.donVi).filter(Boolean)));
 
   return (
     <div className="space-y-4">
       {/* Clean & Compact Control Toolbar (No big hero panel) */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          
+
           {/* Section Segment Switcher */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
             <button
               type="button"
               onClick={() => setFilterSection('ALL')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                filterSection === 'ALL'
-                  ? 'bg-[#0f2444] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${filterSection === 'ALL'
+                ? 'bg-[#0f2444] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <Layers className="w-3.5 h-3.5 text-amber-400" />
               <span>Tất cả II & III ({totalCombined})</span>
@@ -522,11 +518,10 @@ export default function MainBC({
             <button
               type="button"
               onClick={() => setFilterSection('B')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                filterSection === 'B'
-                  ? 'bg-sky-700 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${filterSection === 'B'
+                ? 'bg-sky-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <Clock className="w-3.5 h-3.5 text-sky-300" />
               <span>Mục II - Thời hạn ({totalBCount})</span>
@@ -534,11 +529,10 @@ export default function MainBC({
             <button
               type="button"
               onClick={() => setFilterSection('C')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                filterSection === 'C'
-                  ? 'bg-purple-700 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${filterSection === 'C'
+                ? 'bg-purple-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <RefreshCw className="w-3.5 h-3.5 text-purple-300" />
               <span>Mục III - Thường xuyên ({totalCCount})</span>
@@ -556,7 +550,7 @@ export default function MainBC({
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-[#a3212e] focus:outline-none transition"
             />
             {search && (
-              <button 
+              <button
                 onClick={() => setSearch('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
@@ -587,63 +581,101 @@ export default function MainBC({
         </div>
 
         {/* Secondary Filters row */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+        <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-100 text-xs">
           {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span className="font-semibold text-slate-500">Trạng thái:</span>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:border-[#a3212e] outline-none"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="Hoàn thành">Đã hoàn thành (Tất cả)</option>
-              <option value="Hoàn thành đúng hạn">Hoàn thành đúng hạn</option>
-              <option value="Hoàn thành trễ hạn">Hoàn thành trễ hạn</option>
-              <option value="Chưa hoàn thành">Chưa hoàn thành</option>
-              <option value="Quá hạn">Đã quá hạn</option>
-              <option value="Không áp dụng">Không áp dụng</option>
-            </select>
-          </div>
-
-          {/* Unit Filter */}
-          {allUnits.length > 0 && (
+          <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              <span className="font-semibold text-slate-500">Đơn vị:</span>
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <span className="font-semibold text-slate-500">Trạng thái:</span>
               <select
-                value={filterUnit}
-                onChange={(e) => setFilterUnit(e.target.value)}
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
                 className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:border-[#a3212e] outline-none"
               >
-                <option value="">Tất cả đơn vị</option>
-                {allUnits.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
+                <option value="">Tất cả</option>
+                <option value="Hoàn thành">Đã hoàn thành</option>
+                <option value="Hoàn thành đúng hạn">Hoàn thành đúng hạn</option>
+                <option value="Hoàn thành trễ hạn">Hoàn thành trễ hạn</option>
+                <option value="Chưa hoàn thành">Chưa hoàn thành</option>
+                <option value="Không áp dụng">Không áp dụng</option>
               </select>
             </div>
-          )}
+            {/* Deadline Quick Filters */}
+            <button
+              type="button"
+              onClick={() => setFilterDeadline(filterDeadline === 'qua_han' ? '' : 'qua_han')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition ${filterDeadline === 'qua_han' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+            >
+              <AlertTriangle className="w-3 h-3" />
+              <span>Quá hạn</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterDeadline(filterDeadline === 'sap_den_han' ? '' : 'sap_den_han')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition ${filterDeadline === 'sap_den_han' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
+            >
+              <Clock className="w-3 h-3" />
+              <span>Sắp đến hạn</span>
+            </button>
+          </div>
 
-          {/* Score summary inline badge */}
-          <div className="ml-auto flex items-center gap-2">
+
+          {/* Score summary & Sort Controls */}
+          <div className="ml-auto flex items-center gap-4">
             <span className="text-[11px] font-semibold text-slate-500">
               Tổng điểm: <strong className="text-[#a3212e] font-mono">{totalScoreCombined.toFixed(1)} / {totalMaxScoreCombined.toFixed(1)}</strong>
             </span>
 
-            {/* Sort By */}
-            <div className="flex items-center gap-1">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:border-[#a3212e] outline-none"
+            {/* Card Style Toggle */}
+            {viewMode === 'card' && (
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setCardViewStyle('grid')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition ${cardViewStyle === 'grid' ? 'bg-white text-[#a3212e] shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  title="Hiển thị dạng lưới"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Lưới</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardViewStyle('list')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition ${cardViewStyle === 'list' ? 'bg-white text-[#a3212e] shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                  title="Hiển thị dạng danh sách"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Danh sách</span>
+                </button>
+              </div>
+            )}
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setSortField('ngayHetHan')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition ${sortField === 'ngayHetHan' ? 'bg-white text-[#a3212e] shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
               >
-                <option value="ngayHetHan_asc">Hạn chót (Tăng dần)</option>
-                <option value="ngayHetHan_desc">Hạn chót (Giảm dần)</option>
-                <option value="ngay_asc">Ngày văn bản (Cũ đến mới)</option>
-                <option value="ngay_desc">Ngày văn bản (Mới đến cũ)</option>
-              </select>
+                <CalendarClock className="w-3.5 h-3.5" />
+                <span>Hạn chót</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortField('ngay')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition ${sortField === 'ngay' ? 'bg-white text-[#a3212e] shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+                <span>Ngày ban hành</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                className="p-1.5 text-slate-600 hover:text-slate-900 bg-white rounded-lg shadow-sm border border-slate-200"
+                title={sortDirection === 'asc' ? 'Sắp xếp tăng dần' : 'Sắp xếp giảm dần'}
+              >
+                {sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+              </button>
             </div>
           </div>
         </div>
@@ -710,7 +742,7 @@ export default function MainBC({
               <p className="text-xs text-slate-500 mt-1">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className={cardViewStyle === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-4"}>
               {filteredList.map(({ task, section, originalIndex }) => {
                 const statusInfo = getTaskStatusInfo(task, todayISO);
                 const isDone = isTaskCompleted(task.trangThai);
@@ -720,9 +752,8 @@ export default function MainBC({
                 return (
                   <div
                     key={`${section}-${task.id || originalIndex}`}
-                    className={`bg-white rounded-2xl border transition-all duration-200 hover:shadow-md flex flex-col justify-between overflow-hidden ${
-                      section === 'B' ? 'border-sky-200/80 hover:border-sky-400' : 'border-purple-200/80 hover:border-purple-400'
-                    }`}
+                    className={`bg-white rounded-2xl border transition-all duration-200 hover:shadow-md flex flex-col justify-between overflow-hidden ${section === 'B' ? 'border-sky-200/80 hover:border-sky-400' : 'border-purple-200/80 hover:border-purple-400'
+                      }`}
                   >
                     {/* Card Top Header */}
                     <div className="p-4 space-y-3">
@@ -826,11 +857,10 @@ export default function MainBC({
                               });
                             }
                           }}
-                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                            isDone
-                              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                              : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
-                          }`}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${isDone
+                            ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                            : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
+                            }`}
                         >
                           <CheckCircle className="w-3.5 h-3.5" />
                           <span>{isDone ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}</span>
@@ -856,7 +886,7 @@ export default function MainBC({
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
                 <h3 className="font-display font-bold text-base text-[#0f2444] uppercase tracking-wide">
-                  {modalType === 'add' 
+                  {modalType === 'add'
                     ? `Thêm nhiệm vụ mới (${targetSection === 'B' ? 'Mục II • Có thời hạn' : 'Mục III • Thường xuyên'})`
                     : `Chỉnh sửa nhiệm vụ (${targetSection === 'B' ? 'Mục II' : 'Mục III'})`}
                 </h3>
@@ -872,7 +902,7 @@ export default function MainBC({
             </div>
 
             <form onSubmit={handleSaveTask} className="space-y-4 text-xs">
-              
+
               {/* Target Section Selection if Modal Type is Add */}
               {modalType === 'add' && (
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">

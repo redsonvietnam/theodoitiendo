@@ -17,11 +17,13 @@ export interface DocTypeMapping {
 
 // Vietnamese standard police department abbreviations (Công an cấp tỉnh) with keyboard shortcuts (gõ tắt)
 export const POLICE_DEPARTMENTS: PoliceDepartment[] = [
-  { code: 'PV01', name: 'Phòng Tham mưu', aliases: ['v1', 'pv1', 'v01', 'pv01', 'thammuu', 'tm'] },
+  { code: 'PV01', name: 'Phòng Tham mưu', aliases: ['v1', 'pv1', 'v01', 'pv01', 'thammuu', 'tm', 'v'] },
+  { code: 'PV06', name: 'Phòng Hồ sơ nghiệp vụ', aliases: ['v6', 'pv6', 'v06', 'pv06', 'hosonghiepvu', 'hsnv'] },
   { code: 'PX01', name: 'Phòng Tổ chức cán bộ', aliases: ['x1', 'px1', 'x01', 'px01', 'tochuccanbo', 'tccb'] },
   { code: 'PX03', name: 'Phòng Công tác đảng và công tác chính trị', aliases: ['x3', 'px3', 'x03', 'px03', 'congtacdang', 'ctd', 'ctct', 'tuyengiao'] },
   { code: 'PX05', name: 'Thanh tra Công an tỉnh', aliases: ['x5', 'px5', 'x05', 'px05', 'thanhtra', 'tt'] },
-  { code: 'PH10', name: 'Phòng Hậu cần', aliases: ['h', 'h10', 'ph10', 'haucan', 'hc', 'phonghaucan'] },
+  { code: 'PX06', name: 'Cơ quan Ủy ban Kiểm tra Đảng ủy', aliases: ['x6', 'px6', 'x06', 'px06', 'ubktdanguy', 'ubkt'] },
+  { code: 'PH10', name: 'Phòng Hậu cần', aliases: ['ph', 'ph10', 'haucan', 'hc', 'phonghaucan'] },
   { code: 'PA01', name: 'Phòng An ninh đối ngoại', aliases: ['a1', 'pa1', 'a01', 'pa01', 'doingoai', 'dn', 'an1'] },
   { code: 'PA02', name: 'Phòng An ninh đối nội', aliases: ['a2', 'pa2', 'a02', 'pa02', 'doinoi', 'dn2', 'an2'] },
   { code: 'PA03', name: 'Phòng An ninh chính trị nội bộ', aliases: ['a3', 'pa3', 'a03', 'pa03', 'chinhtrinoibo', 'ctnb', 'an3'] },
@@ -30,7 +32,7 @@ export const POLICE_DEPARTMENTS: PoliceDepartment[] = [
   { code: 'PA06', name: 'Phòng Kỹ thuật nghiệp vụ', aliases: ['a6', 'pa6', 'a06', 'pa06', 'kythuatnghiepvu', 'ktnv', 'an6'] },
   { code: 'PA08', name: 'Phòng Quản lý xuất nhập cảnh', aliases: ['a8', 'pa8', 'a08', 'pa08', 'xuatnhapcanh', 'xnc', 'an8'] },
   { code: 'PA09', name: 'Phòng Điều tra an ninh', aliases: ['a9', 'pa9', 'a09', 'pa09', 'dieutraanninh', 'dtan', 'an9'] },
-  { code: 'PC01', name: 'Văn phòng Cơ quan Cảnh sát điều tra', aliases: ['c1', 'pc1', 'c01', 'pc01', 'canhsatdieutra', 'csdt', 'vp', 'vpcsqldt'] },
+  { code: 'PC01', name: 'Văn phòng Cơ quan Cảnh sát điều tra', aliases: ['01', 'c1', 'pc1', 'c01', 'pc01', 'canhsatdieutra', 'csdt', 'vp', 'vpcsqldt'] },
   { code: 'PC02', name: 'Phòng Cảnh sát hình sự', aliases: ['c2', 'pc2', 'c02', 'pc02', 'hinhsu', 'hs', 'cshs'] },
   { code: 'PC03', name: 'Phòng Cảnh sát ĐTTP về tham nhũng, kinh tế, buôn lậu, môi trường', aliases: ['c3', 'pc3', 'c03', 'pc03', 'cskinte', 'cskt', 'bl', 'moitruong'] },
   { code: 'PC04', name: 'Phòng Cảnh sát ĐTTP về ma túy', aliases: ['c4', 'pc4', 'c04', 'pc04', 'matuy', 'mt', 'csmt'] },
@@ -38,8 +40,8 @@ export const POLICE_DEPARTMENTS: PoliceDepartment[] = [
   { code: 'PC07', name: 'Phòng Cảnh sát PCCC và CNCH', aliases: ['c7', 'pc7', 'c07', 'pc07', 'pccc', 'cnch', 'phongchay', 'chuuahuy'] },
   { code: 'PC08', name: 'Phòng Cảnh sát giao thông', aliases: ['c8', 'pc8', 'c08', 'pc08', 'giaothong', 'csgt', 'gt'] },
   { code: 'PC09', name: 'Phòng Kỹ thuật hình sự', aliases: ['c9', 'pc9', 'c09', 'pc09', 'kythuathinhsu', 'kths'] },
-  { code: 'PC10', name: 'Phòng Cảnh sát thi hành án hình sự và hỗ trợ tư pháp', aliases: ['c10', 'pc10', 'c10', 'pc10', 'thihanhan', 'tha', 'cs10'] },
-  { code: 'PC11', name: 'Phòng Cảnh sát cơ động', aliases: ['c11', 'pc11', 'c11', 'pc11', 'codong', 'cscd', 'cd', 'cs11'] },
+  { code: 'PC10', name: 'Phòng Cảnh sát thi hành án hình sự và hỗ trợ tư pháp', aliases: ['10', 'c10', 'pc10', 'thihanhan', 'tha', 'cs10'] },
+  { code: 'PC11', name: 'Phòng Cảnh sát Trại tạm giam, Trại tạm giữ', aliases: ['11', 'c11', 'pc11', 'traitamgiam', 'ttg'] },
   { code: 'PK02', name: 'Phòng Cảnh sát cơ động', aliases: ['k2', 'pk2', 'k02', 'pk02', 'codong', 'cscd', 'cd', 'pk', 'k1', 'pk1', 'k01', 'pk01'] }
 ];
 
@@ -62,20 +64,23 @@ export function matchDepartment(dept: PoliceDepartment, keyword: string): boolea
   if (!cleanKeyword) return true;
 
   // 1. Special single character / prefix shortcuts
-  if (cleanKeyword === 'c' || cleanKeyword === 'pc') {
+  if (cleanKeyword === 'c') {
     return dept.code.startsWith('PC');
   }
-  if (cleanKeyword === 'a' || cleanKeyword === 'pa') {
+  if (cleanKeyword === 'a') {
     return dept.code.startsWith('PA');
   }
-  if (cleanKeyword === 'h' || cleanKeyword === 'ph') {
+  if (cleanKeyword === 'ph') {
     return dept.code.startsWith('PH');
   }
   if (cleanKeyword === 'x' || cleanKeyword === 'px') {
     return dept.code.startsWith('PX');
   }
-  if (cleanKeyword === 'v' || cleanKeyword === 'pv') {
+  if (cleanKeyword === 'pv') {
     return dept.code.startsWith('PV');
+  }
+  if (cleanKeyword === 'v') {
+    return dept.code === 'PV01';
   }
   if (cleanKeyword === 'k' || cleanKeyword === 'pk' || cleanKeyword === 'k2' || cleanKeyword === 'pk2') {
     return dept.code.startsWith('PK') || dept.code === 'PK02' || dept.code === 'PK01';
@@ -85,7 +90,7 @@ export function matchDepartment(dept: PoliceDepartment, keyword: string): boolea
   if (dept.code.toLowerCase().includes(cleanKeyword)) return true;
 
   // 3. Alias match (e.g. a1 matches PA01, x3 matches PX03)
-  if (dept.aliases.some(alias => alias.toLowerCase().includes(cleanKeyword))) return true;
+  if (dept.aliases.some(alias => alias.toLowerCase() === cleanKeyword)) return true;
 
   // 4. Direct name match (e.g. Tham muu)
   // Ensure short words (<= 2 chars) only match at the start of a word inside the name
@@ -144,7 +149,7 @@ export function getDocTypeSymbol(docType: string): string {
     m => m.name.toLowerCase().trim() === docType.toLowerCase().trim()
   );
   if (match) return match.symbol;
-  
+
   // Dynamic fallback: take the first letters of each word capitalized
   const words = docType.trim().split(/\s+/);
   if (words.length === 1) {
@@ -209,7 +214,7 @@ export function parseDocumentNumber(soFull: string): ParsedDocNumber {
 
   const trimmed = soFull.trim();
   const slashIndex = trimmed.indexOf('/');
-  
+
   if (slashIndex === -1) {
     // If no slash, it's either just a number or just a symbol
     if (/^\d+$/.test(trimmed)) {
@@ -235,14 +240,14 @@ export function parseDocumentNumber(soFull: string): ParsedDocNumber {
   const symbolOnly = trimmed.substring(slashIndex).trim(); // includes the leading slash e.g., "/KH-CAT-PA04"
 
   const isFromCAT = symbolOnly.includes('-CAT');
-  
+
   // Try to find if any of standard department codes exist in the suffix
   let departmentCode = '';
   let customSuffix = '';
-  
+
   // Sort departments by code length descending to match longer ones first if any
   const sortedDepts = [...POLICE_DEPARTMENTS].sort((a, b) => b.code.length - a.code.length);
-  
+
   for (const dept of sortedDepts) {
     // Check if the symbol ends with the department code or has it preceded by a dash
     if (symbolOnly.endsWith(dept.code) || symbolOnly.includes(`-${dept.code}`)) {
@@ -287,6 +292,7 @@ export const SHORTHAND_DOC_TYPES = [
   { short: 'gnp', name: 'Giấy nghỉ phép', symbol: 'GNP' },
   { short: 'qyd', name: 'Quy định', symbol: 'QyĐ' },
   { short: 'qyđ', name: 'Quy định', symbol: 'QyĐ' },
+  { short: 'qy', name: 'Quy định', symbol: 'QyĐ' },
   { short: 'kh', name: 'Kế hoạch', symbol: 'KH' },
   { short: 'bc', name: 'Báo cáo', symbol: 'BC' },
   { short: 'cv', name: 'Công văn', symbol: '' },
@@ -303,7 +309,6 @@ export const SHORTHAND_DOC_TYPES = [
   { short: 'đa', name: 'Đề án', symbol: 'ĐA' },
   { short: 'bb', name: 'Biên bản', symbol: 'BB' },
   { short: 'hđ', name: 'Hợp đồng', symbol: 'HĐ' },
-  { short: 'hd', name: 'Hợp đồng', symbol: 'HĐ' },
   { short: 'cd', name: 'Công điện', symbol: 'CĐ' },
   { short: 'cđ', name: 'Công điện', symbol: 'CĐ' },
   { short: 'gm', name: 'Giấy mời', symbol: 'GM' },
@@ -318,7 +323,7 @@ export const SHORTHAND_DOC_TYPES = [
 
 export function tryExpandShorthand(input: string): ShorthandExpansionResult | null {
   if (!input) return null;
-  
+
   let str = input.toLowerCase().trim();
   if (str.startsWith('/')) {
     str = str.substring(1);
@@ -351,7 +356,7 @@ export function tryExpandShorthand(input: string): ShorthandExpansionResult | nu
   let matchedDept = null;
   if (cleanDeptStr) {
     // Exact match or alias match
-    matchedDept = POLICE_DEPARTMENTS.find(d => 
+    matchedDept = POLICE_DEPARTMENTS.find(d =>
       d.code.toLowerCase() === cleanDeptStr ||
       d.aliases.some(alias => alias.toLowerCase() === cleanDeptStr)
     );
@@ -384,7 +389,7 @@ export function parseDocumentSymbolTwoWay(symbolStr: string): TwoWayParsedResult
   // Strip leading slash if any
   let cleanSymbol = symbolStr.startsWith('/') ? symbolStr.substring(1) : symbolStr;
   cleanSymbol = cleanSymbol.trim();
-  
+
   if (!cleanSymbol) {
     return {
       detectedIsFromCAT: false
@@ -405,7 +410,7 @@ export function parseDocumentSymbolTwoWay(symbolStr: string): TwoWayParsedResult
       break;
     }
   }
-  
+
   if (!detectedDeptCode) {
     for (const d of sortedDepts) {
       if (cleanSymbol.toUpperCase().includes(d.code.toUpperCase())) {

@@ -1120,7 +1120,7 @@ export default function MainSectionBC({
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1.5">
                       {row.danhSachMoc.map((moc, mIdx) => {
-                        const isDone = moc.trangThai === 'Hoàn thành đúng hạn' || moc.trangThai === 'Hoàn thành trễ hạn' || moc.trangThai === 'Đã hoàn thành' || moc.trangThai === 'Hoàn thành';
+                        const isDone = (moc.trangThai || '').startsWith('Hoàn thành') || moc.trangThai === 'Đã hoàn thành';
                         return (
                           <div key={moc.id || mIdx} className="bg-white border border-sky-200/60 rounded p-1.5 shadow-3xs space-y-0.5">
                             <div className="flex items-center justify-between gap-1">
@@ -1499,6 +1499,7 @@ export default function MainSectionBC({
                         const val = e.target.value;
                         if (val === 'Hoàn thành') {
                           setTrangThai('Hoàn thành');
+                          setIsCompletedChoice('hoan_thanh');
                           if (!ngayHoanThanh) {
                             const today = getTodayDateString();
                             setNgayHoanThanh(today);
@@ -1506,6 +1507,7 @@ export default function MainSectionBC({
                           }
                         } else {
                           setTrangThai('-');
+                          setIsCompletedChoice('chua_hoan_thanh');
                           setNgayHoanThanh('');
                           setQuickDateHoanThanh('');
                         }
@@ -1518,7 +1520,7 @@ export default function MainSectionBC({
                     {/* Sản phẩm */}
                     <div className={shouldFocusProduct ? 'p-2.5 rounded-xl border-2 border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/40 transition-all shadow-xs' : ''}>
                       <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                        <span>Sản phẩm <span className="text-slate-400 font-normal text-[10px]">(nếu có sản phẩm, trạng thái sẽ tự chuyển thành hoàn thành)</span></span>
+                        <span>Sản phẩm <span className="text-slate-400 font-normal text-[10px]">(không tự động đổi trạng thái — muốn đánh dấu hoàn thành, chọn "Hoàn thành" ở trên)</span></span>
                         {shouldFocusProduct && <span className="text-[10px] text-amber-800 font-extrabold uppercase animate-pulse">👉 Nhập sản phẩm tại đây</span>}
                       </label>
                       <input
@@ -1531,21 +1533,7 @@ export default function MainSectionBC({
                         }`}
                         placeholder="Ví dụ: Báo cáo số 12/BC-TTH, Kế hoạch..."
                         value={sanPham}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSanPham(val);
-                          if (val.trim() !== '') {
-                            setIsCompletedChoice('hoan_thanh');
-                            if (!trangThai || trangThai === 'Chưa hoàn thành' || trangThai === '-') {
-                              setTrangThai('Đã hoàn thành');
-                              if (!ngayHoanThanh) {
-                                const today = getTodayDateString();
-                                setNgayHoanThanh(today);
-                                setQuickDateHoanThanh(formatToDDMMYY(today));
-                              }
-                            }
-                          }
-                        }}
+                        onChange={(e) => setSanPham(e.target.value)}
                       />
                     </div>
 

@@ -40,7 +40,6 @@ const sendBackupToServer = async (data: AppState) => {
       body: JSON.stringify(data),
     });
   } catch (error) {
-    console.error('Backup server request failed:', error);
     // Expected if the local backup server isn't running.
   }
 };
@@ -143,7 +142,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         authToken: token, authUser: me, needsAuth: false, authError: null,
       });
       // Cache to IndexedDB so the app still shows something if the server drops later.
-      Promise.resolve(setDbState(savedState)).catch(() => { });
+      Promise.resolve(setDbState(savedState)).catch(() => {});
       return true;
     } catch (e) {
       if (e instanceof AuthRequiredError) {
@@ -255,12 +254,12 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         updatedItem = { ...updatedItem, [fieldOrFields as keyof TaskBC]: value };
       }
 
-      // Auto transition status to 'Hoàn thành đúng hạn' if sanPham is entered and has content
-      if (updatedItem.sanPham && updatedItem.sanPham.trim() !== '') {
-        if (!updatedItem.trangThai || updatedItem.trangThai === 'Chưa hoàn thành') {
-          updatedItem.trangThai = 'Hoàn thành đúng hạn';
-        }
-      }
+      // Note: previously auto-transitioned trangThai to 'Hoàn thành đúng hạn'
+      // whenever sanPham had content. Removed per product decision: marking a
+      // task complete must be an explicit action (choosing "Đã hoàn thành"),
+      // independent of whether a sản phẩm has been entered yet. A task can be
+      // "Đã hoàn thành" with no sản phẩm, or have a sản phẩm while still
+      // "Chưa hoàn thành".
 
       // If updating any of the 5 fields, compile canCu automatically
       const keys = typeof fieldOrFields === 'object' ? Object.keys(fieldOrFields) : [fieldOrFields];
@@ -296,12 +295,9 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       const nextId = `${section}${list.length + 1}_${Date.now().toString().slice(-4)}`;
 
       const compiledCanCu = compileCanCu(newTask);
-      let finalTrangThai = newTask.trangThai;
-      if (newTask.sanPham && newTask.sanPham.trim() !== '') {
-        if (!finalTrangThai || finalTrangThai === 'Chưa hoàn thành') {
-          finalTrangThai = 'Hoàn thành đúng hạn';
-        }
-      }
+      // Same policy as updateTaskBC: no longer auto-transitions trangThai
+      // based on sanPham content. Completion is an explicit choice.
+      const finalTrangThai = newTask.trangThai;
       const item: TaskBC = {
         ...newTask,
         trangThai: finalTrangThai,

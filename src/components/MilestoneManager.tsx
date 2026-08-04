@@ -173,8 +173,11 @@ export default function MilestoneManager({
         <div className="space-y-1.5">
           {currentList.map((moc, index) => {
             const currentKieu = moc.kieuThoiHan || 'truoc_ngay';
-            const isDone = moc.trangThai === 'Hoàn thành đúng hạn' || moc.trangThai === 'Hoàn thành trễ hạn' || moc.trangThai === 'Đã hoàn thành';
-            const isLate = moc.trangThai === 'Hoàn thành trễ hạn';
+            // Note: computeAutoStatus stores late completions as e.g.
+            // "Hoàn thành trễ hạn 5 ngày" (day-count suffix), so exact
+            // string equality would silently miss late-completed milestones.
+            const isDone = (moc.trangThai || '').startsWith('Hoàn thành') || moc.trangThai === 'Đã hoàn thành';
+            const isLate = (moc.trangThai || '').includes('trễ hạn');
             const isMonthly = currentKieu === 'truoc_ngay_hang_thang';
             const isYearly = currentKieu === 'hang_nam';
             const isSpecificDate = currentKieu === 'truoc_ngay';
