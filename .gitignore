@@ -8,3 +8,11 @@ coverage/
 !.env.example
 data/
 backups/
+
+# Build artifacts and temporary files
+FINAL_PACKAGE/
+*.zip
+.codegraph/
+CLAUDE_HANDOFF.MD
+DEPLOYMENT_NOTES.md
+server/auth (1).js

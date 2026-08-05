@@ -5,17 +5,15 @@
   "type": "module",
   "scripts": {
     "start": "concurrently \"npm:dev\" \"npm:backend\"",
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=3000",
     "build": "vite build",
     "preview": "vite preview",
-    "backup:server": "node backup-server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "backend": "node server.js",
-    "backend:create-user": "node scripts/setup-users.js",
-    "backend:migrate": "node scripts/migrate-from-backup.js"
+    "backend:create-user": "node scripts/setup-users.js"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

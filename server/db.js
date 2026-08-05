@@ -10,6 +10,13 @@
  *    already keeps in IndexedDB. This avoids a risky full relational
  *    redesign; it can be normalized into per-task rows later if/when the
  *    team grows enough to need real concurrent multi-row editing.
+ *
+ * PATH NOTE: __dirname here is the folder this file lives in on disk, i.e.
+ * <install>/server (this file is server/db.js). path.join(__dirname, '..', 'data')
+ * therefore resolves to <install>/data — one level UP from server/, which is the
+ * install root — not to a folder outside the install. This only breaks if db.js
+ * is ever moved to a different depth without updating the '..' here. Verified
+ * empirically for FINAL_PACKAGE\server\db.js -> FINAL_PACKAGE\data.
  */
 
 import Database from 'better-sqlite3';
@@ -22,6 +29,7 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = process.env.THEODOITIENDO_DB_PATH || path.join(DATA_DIR, 'theodoitiendo.db');
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+console.log(`[db] Using database file: ${DB_PATH}`);
 
 export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');

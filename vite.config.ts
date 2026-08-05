@@ -18,7 +18,14 @@ export default defineConfig(() => {
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      watch:
+        process.env.DISABLE_HMR === 'true'
+          ? null
+          : {
+            // Ignore the final package directory to prevent file locking issues
+            // and unnecessary reloads when creating the offline bundle.
+            ignored: ['**/FINAL_PACKAGE/**'],
+          },
       proxy: {
         '/api': {
           target: 'http://localhost:3002',

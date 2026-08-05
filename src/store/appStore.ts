@@ -30,19 +30,7 @@ const buildSeedState = (): AppState => ({
   hiddenSidebarItems: []
 });
 
-// Attempts to send the current app state to a local backup server.
-// Fails silently if the server is not running.
-const sendBackupToServer = async (data: AppState) => {
-  try {
-    await fetch('http://localhost:3001/backup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-  } catch (error) {
-    // Expected if the local backup server isn't running.
-  }
-};
+// sendBackupToServer removed.
 
 interface AppStore {
   state: AppState;
@@ -142,7 +130,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         authToken: token, authUser: me, needsAuth: false, authError: null,
       });
       // Cache to IndexedDB so the app still shows something if the server drops later.
-      Promise.resolve(setDbState(savedState)).catch(() => {});
+      Promise.resolve(setDbState(savedState)).catch(() => { });
       return true;
     } catch (e) {
       if (e instanceof AuthRequiredError) {
@@ -159,31 +147,9 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     if (get().hasLoaded) return;
     set({ hasLoaded: true });
 
-    // --- ONE-CLICK RESTORE LOGIC ---
-    try {
-      const response = await fetch('/restore.json');
-      if (response.ok) {
-        const restoredData = await response.json();
-
-        if (restoredData && restoredData.meta && Array.isArray(restoredData.B)) {
-          console.log('Restore file found, proceeding with data recovery.');
-
-          await setDbState(restoredData);
-          set({ state: restoredData, isLoading: false });
-          alert('Dữ liệu đã được phục hồi thành công từ file backup gần nhất!');
-
-          try {
-            await fetch('http://localhost:3001/delete-restore-file', { method: 'POST' });
-            console.log('Restore file cleanup signal sent to server.');
-          } catch (e) {
-            console.error('Could not send cleanup signal to server:', e);
-          }
-          return;
-        }
-      }
-    } catch (error) {
-      // Normal if the restore file doesn't exist. Silently continue.
-    }
+    // --- ONE-CLICK RESTORE LOGIC (REMOVED) ---
+    // The logic to check for /restore.json has been removed as per the
+    // new architecture decision to simplify the backup process.
     // --- END OF RESTORE LOGIC ---
 
     // --- BACKEND DETECTION (node server.js) ---
@@ -377,7 +343,7 @@ useAppStore.subscribe((curr, prev) => {
       // IndexedDB is always written — it doubles as the local cache when a
       // backend is in use (see architecture decision in HANDOFF.md §3).
       await setDbState(stateToSave);
-      sendBackupToServer(stateToSave);
+      // sendBackupToServer(stateToSave); // Removed
 
       const { backendAvailable, authToken } = useAppStore.getState();
       if (backendAvailable && authToken) {
