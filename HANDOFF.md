@@ -125,6 +125,8 @@ Tách 4 custom hook:
     1. Không có backend (health check thất bại/timeout) → rơi thẳng vào đúng luồng IndexedDB cũ, không đổi hành vi khi chạy `npm run dev`/`npm start`.
     2. Có backend, chưa có token trong `localStorage` → `needsAuth = true`, dừng lại, chờ người dùng đăng nhập.
     3. Có backend, có token → gọi `/api/state` + `/api/auth/me`. Thành công thì dùng dữ liệu từ server (đồng thời ghi xuống IndexedDB làm cache, theo đúng quyết định kiến trúc mục 3). Token hết hạn (401) → xoá token, `needsAuth = true`. Lỗi mạng khác (backend "sập" giữa chừng ngay sau health check) → rơi về IndexedDB như trường hợp 1.
+    
+> Historical note: references to the old `restore.json` flow in earlier sections describe the pre-T2-F2 implementation/history only. They are NOT part of the current production completion/restore contract. Do not reintroduce or restore `/restore.json` without an explicit new task/product decision.
   - Side-effect tự động lưu (debounce 300ms) — vẫn luôn ghi IndexedDB trước tiên (cache cục bộ không đổi), sau đó nếu có `backendAvailable && authToken` thì gọi thêm `PUT /api/state`. Token hết hạn giữa chừng lúc lưu → tự xoá token, bật lại `needsAuth`, báo `saveError` rõ ràng (dữ liệu vẫn an toàn trong IndexedDB, không mất).
 - `src/hooks/useAppState.ts` — expose thêm `backendAvailable`, `needsAuth`, `authUser`, `logout` ra ngoài (theo đúng pattern wrapper cũ).
 - `src/App.tsx` — thêm nhánh render `<Login />` khi `needsAuth === true` (đặt ngay sau màn hình loading, trước nội dung chính). Truyền `authUser`/`logout` xuống `Settings`.
@@ -198,3 +200,96 @@ Cả 5 ưu tiên đã hoàn thành, bao gồm việc nối frontend vào backend
 ## 7. File đính kèm
 
 File zip project đầy đủ (đã bao gồm mọi thay đổi ở mục 4) nằm cùng tin nhắn này trên Claude.ai — hãy tải về và tải lên lại ở phiên chat mới cùng với file `HANDOFF.md` này.
+
+## CURRENT CHECKPOINT — 2026-08-12
+
+### Git checkpoint
+
+Latest commit:
+211bbe2 test: exclude package artifacts from vitest discovery
+
+Previous relevant checkpoint:
+f2438e8 fix: close T2-F2 completion and restore flow
+
+### Closed work
+
+- T2-F2: CLOSED
+- FIX-2: CLOSED
+- Vitest test-discovery audit: CLOSED
+- Vitest test-discovery fix: CLOSED
+
+### Test baseline
+
+The authoritative root project test baseline is now:
+128 tests / 12 test files
+
+Breakdown:
+- 103 source/frontend tests
+- 25 root/server tests
+- Total: 128
+
+The previous 160-test discovery was NOT a new project baseline.
+It consisted of:
+- 128 intentional project tests
+- 32 accidental duplicate tests from package artifacts
+
+The 32 accidental tests were:
+- FINAL_PACKAGE/server/auth.test.js — 8
+- FINAL_PACKAGE/server/db.test.js — 8
+- FINAL_PACKAGE_nodel_modules/server/auth.test.js — 8
+- FINAL_PACKAGE_nodel_modules/server/db.test.js — 8
+
+SHA-256 verification established that the package copies of auth.test.js and db.test.js are exact duplicates of the corresponding root/server tests.
+
+### Verification
+
+- `npx vitest run src/hooks/useAppState.test.ts` → 13/13 PASS
+- `npx vitest run src/store/appStore.test.ts` → 9/9 PASS
+- `npm test` → 128 tests PASS / 12 test files
+- `npx tsc --noEmit` → exit 0
+- `git diff --check` → clean
+
+### Commit scope
+
+Commit `211bbe2 test: exclude package artifacts from vitest discovery` contains ONLY:
+
+`vitest.config.ts`
+
+No production source, test files, `.gitignore`, `package.json`, or package artifacts were changed in this commit.
+
+### Artifact status
+
+The following remain untouched:
+
+- `FINAL_PACKAGE/`
+- `FINAL_PACKAGE_nodel_modules/`
+- historical report/audit artifacts
+
+No cleanup has been performed. Cleanup must remain a separate explicit task.
+
+### Working-tree status
+
+Working-tree status not re-verified in this documentation-only task; known untracked artifacts remain from the previous audit.
+
+### Current decision
+
+All five original priorities are complete. The Vitest discovery issue is also closed. There is currently no approved implementation task. The next task requires an explicit owner decision.
+
+Known deferred areas:
+
+- artifact/report cleanup
+- stale documentation review
+- ExcelIO regression coverage
+- status-model ambiguity
+- optional TypeScript type-safety work
+
+Do NOT automatically start any of them.
+
+### Vitest fix
+
+`vitest.config.ts` now explicitly excludes:
+
+```text
+FINAL_PACKAGE/**
+FINAL_PACKAGE_nodel_modules/**
+```
