@@ -749,7 +749,7 @@ export default function App() {
                   {/* Sản phẩm */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">
-                      Sản phẩm <span className="text-slate-400 font-normal text-[10px]">(nếu có sản phẩm phúc đáp, trạng thái sẽ tự động chuyển sang hoàn thành)</span>
+                      Sản phẩm <span className="text-slate-400 font-normal text-[10px]">(không tự động đổi trạng thái)</span>
                     </label>
                     <input
                       type="text"

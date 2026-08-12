@@ -934,7 +934,7 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
   };
 
   // Helper to parse status for section B/C tasks
-  const parseTrangThai = (val: any, diemGiao: number = 0.5, sanPham?: string): TaskBC['trangThai'] => {
+  const parseTrangThai = (val: any, diemGiao: number = 0.5): TaskBC['trangThai'] => {
     if (val !== undefined && val !== null && val !== '') {
       const str = String(val).trim();
       const num = parseFloat(str);
@@ -960,9 +960,6 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
       }
     }
 
-    if (sanPham && sanPham.trim() !== '') {
-      return 'Hoàn thành đúng hạn';
-    }
     return '';
   };
 
@@ -1118,8 +1115,7 @@ export default function ExcelIO({ state, resetToDefault, importState, onBackupEx
 
               const computedTrangThai = parseTrangThai(
                 r[8],
-                !isNaN(diemGiao) ? diemGiao : 0.5,
-                sanPhamVal
+                !isNaN(diemGiao) ? diemGiao : 0.5
               );
 
               if (targetIdx !== -1) {

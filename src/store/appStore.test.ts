@@ -69,7 +69,6 @@ describe('load() — phát hiện backend', () => {
 
   it('có backend nhưng chưa đăng nhập → needsAuth = true, không đụng tới IndexedDB', async () => {
     globalThis.fetch = mockFetchRoutes({
-      '/restore.json': Promise.reject(new Error('no restore file')),
       'GET /api/health': { ok: true },
     });
 

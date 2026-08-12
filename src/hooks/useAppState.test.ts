@@ -93,10 +93,15 @@ describe('useAppState - load', () => {
     expect(result.current.state.meta.donVi).toBe('Công an xã Nâm Nung');
   });
 
-  it('ưu tiên dữ liệu từ restore.json nếu tồn tại, bỏ qua IndexedDB', async () => {
+  it('không còn load dữ liệu từ /restore.json nữa (Option B): khi không có backend, dữ liệu chỉ đến từ IndexedDB', async () => {
     const restoredData: AppState = {
       meta: { donVi: 'Công an xã Nâm Nung', thang: '09/2026' },
-      A: [], B: [makeTaskBC({ id: 'restored-1' })], C: [], D: [],
+      A: [], B: [], C: [], D: [],
+      hiddenSidebarItems: [],
+    };
+    const saved: AppState = {
+      meta: { donVi: 'Công an xã Nâm Nung', thang: '08/2026' },
+      A: [], B: [makeTaskBC({ id: 'b1' })], C: [], D: [],
       hiddenSidebarItems: [],
     };
 
@@ -104,19 +109,17 @@ describe('useAppState - load', () => {
       if (url === '/restore.json') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(restoredData) });
       }
-      // e.g. the cleanup POST to the backup server
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.reject(new Error('no server'));
     });
-    mockedGetState.mockResolvedValue(undefined);
+    mockedGetState.mockResolvedValue(saved);
 
     const { result } = renderHook(() => useAppState());
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    expect(result.current.state.meta.thang).toBe('09/2026');
-    expect(result.current.taskCounts.B).toBe(1);
-    expect(mockedGetState).not.toHaveBeenCalled();
-    expect(window.alert).toHaveBeenCalled();
+    expect(result.current.state.meta.thang).toBe('08/2026');
+    expect(result.current.state.B[0].id).toBe('b1');
+    expect(mockedGetState).toHaveBeenCalled();
   });
 });
 
@@ -163,7 +166,7 @@ describe('useAppState - CRUD', () => {
     expect(result.current.state.C[0].noiDung).toBe('Báo cáo tổng kết năm');
   });
 
-  it('updateTaskBC tự chuyển trạng thái sang "Hoàn thành đúng hạn" khi nhập sản phẩm', async () => {
+  it('updateTaskBC nhập sản phẩm KHÔNG tự động thay đổi trangThai (Option A - completion là explicit)', async () => {
     const { result } = renderHook(() => useAppState());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
@@ -178,7 +181,9 @@ describe('useAppState - CRUD', () => {
       result.current.updateTaskBC('B', 0, 'sanPham', 'Báo cáo đã nộp');
     });
 
-    expect(result.current.state.B[0].trangThai).toBe('Hoàn thành đúng hạn');
+    const task = result.current.state.B[0];
+    expect(task.sanPham).toBe('Báo cáo đã nộp');
+    expect(task.trangThai).toBe('');
   });
 
   it('deleteTaskBC xoá đúng phần tử và đánh lại số thứ tự (stt) liên tục', async () => {
